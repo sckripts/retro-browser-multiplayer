@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+
+readonly command_pipe=/tmp/retroarch-command
+
+while [ ! -p "$command_pipe" ]; do
+  sleep 0.1
+done
+
+# Keep RetroArch's stdin open, then ask its main-thread command dispatcher to
+# flush save memory. Upstream disables its background autosave worker during
+# Netplay, so this avoids reading core memory concurrently with rollback.
+exec 3>"$command_pipe"
+while :; do
+  sleep 10
+  printf 'SAVE_FILES\n' >&3 || exit 0
+done

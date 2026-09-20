@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "retro-session-manager"
+version = "0.1.0"
+description = "Retro Browser Multiplayer session orchestration service"
+requires-python = ">=3.14,<3.15"
+license = "Apache-2.0"
+dependencies = [
+  "fastapi==0.141.1",
+  "pydantic==2.13.5",
+  "prometheus-client==0.26.0",
+  "uvicorn==0.52.4",
+  "valkey==6.1.1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/retro_sessions"]

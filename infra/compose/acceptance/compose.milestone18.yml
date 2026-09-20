@@ -1,0 +1,121 @@
+name: retro-browser-milestone14
+
+# Private observability extension of the accepted public stack. Prometheus is
+# reachable only from the internal observability plane; Grafana binds to the
+# operator-selected host interface and defaults to localhost.
+services:
+  runtime-agent:
+    image: retrobrowser/runtime-agent:milestone18
+    environment:
+      RUNTIME_AGENT_METRICS_TARGET_ROOT: /srv/retrobrowser/metrics-targets
+      RUNTIME_AGENT_MAX_RUNTIMES: ${M18_RUNTIME_CAPACITY:-8}
+    volumes:
+      - type: bind
+        source: ${M18_DOCKER_METRICS_TARGET_ROOT:?set in .env.milestone14}
+        target: /srv/retrobrowser/metrics-targets
+
+  session-manager:
+    image: retrobrowser/session-manager:milestone18
+    environment:
+      SESSION_MANAGER_RUNTIME_CAPACITY: ${M18_RUNTIME_CAPACITY:-8}
+
+  network-anchor:
+    image: retrobrowser/runtime-agent:milestone18
+
+  coturn:
+    command: !override
+      - -n
+      - --log-file=stdout
+      - --external-ip=$$(detect-external-ip)
+      - --allowed-peer-ip=$$(detect-external-ip)
+      - --listening-ip=0.0.0.0
+      - --listening-port=3478
+      - --tls-listening-port=5349
+      - --min-port=49160
+      - --max-port=49200
+      - --realm=${M14_TURN_REALM:?set in .env.milestone14}
+      - --server-name=${M14_TURN_HOST:?set in .env.milestone14}
+      - --use-auth-secret
+      - --static-auth-secret=${M14_TURN_SHARED_SECRET:?set in .env.milestone14}
+      - --fingerprint
+      - --unauthorized-ratelimit
+      - --stale-nonce=600
+      - --user-quota=8
+      - --total-quota=40
+      - --max-bps=12000000
+      - --pidfile=/tmp/turnserver.pid
+      - --no-multicast-peers
+      - --no-tcp-relay
+      - --cert=/run/secrets/tls_cert
+      - --pkey=/run/secrets/tls_key
+      - --prometheus
+      - --prometheus-address=0.0.0.0
+      - --prometheus-port=9641
+    expose: ["9641"]
+
+  prometheus:
+    image: prom/prometheus:v3.7.3@sha256:49214755b6153f90a597adcbff0252cc61069f8ab69ce8411285cd4a560e8038
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+    user: "65534:0"
+    volumes:
+      - ../../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - type: bind
+        source: ${M18_DOCKER_METRICS_TARGET_ROOT:?set in .env.milestone14}
+        target: /etc/prometheus/runtime-targets
+        read_only: true
+      - prometheus-data:/prometheus
+    networks:
+      - control
+      - stream
+      - observability
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:9090/-/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  grafana:
+    image: grafana/grafana:12.3.0@sha256:70d9599b186ce287be0d2c5ba9a78acb2e86c1a68c9c41449454d0fc3eeb84e8
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${M18_GRAFANA_ADMIN_PASSWORD:?set in .env.milestone14}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SERVER_ENABLE_GZIP: "true"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_PLUGINS_CHECK_FOR_UPDATES: "false"
+    ports:
+      - "${M18_OBSERVABILITY_BIND_ADDRESS:-127.0.0.1}:${M18_GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - ../../grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../../grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    networks: [observability, ingress]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1:3000/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+networks:
+  observability:
+    internal: true
+
+volumes:
+  prometheus-data: {}
+  grafana-data: {}

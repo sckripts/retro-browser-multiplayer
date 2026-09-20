@@ -1,0 +1,12 @@
+http:
+  routers:
+    romm:
+      entryPoints: [web]
+      rule: PathPrefix(`/`)
+      service: romm
+  services:
+    romm:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: http://romm:8080

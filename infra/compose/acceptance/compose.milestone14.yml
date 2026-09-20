@@ -1,0 +1,165 @@
+name: retro-browser-milestone14
+
+# Public overlay for the accepted Milestone 10-12 control plane. Apply last.
+services:
+  runtime-agent:
+    image: retrobrowser/runtime-agent:milestone14
+    environment:
+      RUNTIME_AGENT_ALLOWED_ORIGINS: https://${M14_PUBLIC_HOSTNAME:?set in .env.milestone14}
+      RUNTIME_AGENT_ROUTE_HOST: ${M14_PUBLIC_HOSTNAME:?set in .env.milestone14}
+      RUNTIME_AGENT_STREAM_MODE: webrtc
+      RUNTIME_AGENT_TURN_REST_URI: http://turn-rest:8008/
+      RUNTIME_AGENT_TURN_REST_API_KEY: ${M14_TURN_REST_API_KEY:?set in .env.milestone14}
+      RUNTIME_AGENT_TURN_REST_USERNAME: m14
+      RUNTIME_AGENT_TURN_PROTOCOL: udp
+      RUNTIME_AGENT_TURN_TLS: "false"
+      RUNTIME_AGENT_STUN_HOST: ${M14_TURN_HOST:?set in .env.milestone14}
+      RUNTIME_AGENT_STUN_PORT: ${M14_TURN_PORT:-3478}
+
+  session-manager:
+    image: retrobrowser/session-manager:milestone14
+    environment:
+      SESSION_MANAGER_MAX_SESSION_SECONDS: "14400"
+      SESSION_MANAGER_LOBBY_LEASE_SECONDS: "120"
+      SESSION_MANAGER_IDLE_TIMEOUT_SECONDS: "45"
+      SESSION_MANAGER_CLEANUP_INTERVAL_SECONDS: "10"
+
+  network-anchor:
+    image: retrobrowser/runtime-agent:milestone14
+
+  romm:
+    image: ${M14_ROMM_IMAGE:?set in .env.milestone14}
+    environment:
+      ROMM_BASE_URL: https://${M14_PUBLIC_HOSTNAME:?set in .env.milestone14}
+      OIDC_REDIRECT_URI: https://${M14_PUBLIC_HOSTNAME:?set in .env.milestone14}/api/oauth/openid
+      OIDC_SERVER_APPLICATION_URL: https://${M14_AUTH_HOSTNAME:?set in .env.milestone14}/application/o/romm
+    extra_hosts: !override
+      - "${M14_AUTH_HOSTNAME:?set in .env.milestone14}:host-gateway"
+    ports: !reset []
+
+  authentik-server:
+    environment:
+      AUTHENTIK_EMAIL__HOST: ${M14_SMTP_HOST:?set in .env.milestone14}
+      AUTHENTIK_EMAIL__PORT: ${M14_SMTP_PORT:?set in .env.milestone14}
+      AUTHENTIK_EMAIL__USERNAME: ${M14_SMTP_USERNAME:?set in .env.milestone14}
+      AUTHENTIK_EMAIL__PASSWORD: ${M14_SMTP_PASSWORD:?set in .env.milestone14}
+      AUTHENTIK_EMAIL__USE_TLS: ${M14_SMTP_USE_TLS:-true}
+      AUTHENTIK_EMAIL__USE_SSL: ${M14_SMTP_USE_SSL:-false}
+      AUTHENTIK_EMAIL__FROM: ${M14_SMTP_FROM:?set in .env.milestone14}
+    ports: !reset []
+
+  authentik-worker:
+    environment:
+      AUTHENTIK_EMAIL__HOST: ${M14_SMTP_HOST:?set in .env.milestone14}
+      AUTHENTIK_EMAIL__PORT: ${M14_SMTP_PORT:?set in .env.milestone14}
+      AUTHENTIK_EMAIL__USERNAME: ${M14_SMTP_USERNAME:?set in .env.milestone14}
+      AUTHENTIK_EMAIL__PASSWORD: ${M14_SMTP_PASSWORD:?set in .env.milestone14}
+      AUTHENTIK_EMAIL__USE_TLS: ${M14_SMTP_USE_TLS:-true}
+      AUTHENTIK_EMAIL__USE_SSL: ${M14_SMTP_USE_SSL:-false}
+      AUTHENTIK_EMAIL__FROM: ${M14_SMTP_FROM:?set in .env.milestone14}
+
+  mailpit:
+    ports: !reset []
+
+  edge:
+    command: ["--configFile=/etc/traefik/traefik.yml"]
+    ports: !override
+      - "${M14_BIND_ADDRESS:-0.0.0.0}:${M14_HTTP_PORT:-80}:8080"
+      - "${M14_BIND_ADDRESS:-0.0.0.0}:${M14_HTTPS_PORT:-443}:8443"
+    volumes: !override
+      - ../../traefik/static/milestone14.yml:/etc/traefik/traefik.yml:ro
+      - type: bind
+        source: ${M10_DOCKER_ROUTE_ROOT:?set in .env.milestone14}
+        target: /etc/traefik/dynamic
+        read_only: true
+    secrets:
+      - tls_cert
+      - tls_key
+    networks:
+      - identity
+
+  turn-rest:
+    image: ghcr.io/selkies-project/selkies/turn-rest:main@sha256:53e48365eee7a66886a75a9f37a4733895d864703928600bb5e4fa786e977f04
+    environment:
+      TURN_SHARED_SECRET: ${M14_TURN_SHARED_SECRET:?set in .env.milestone14}
+      TURN_API_KEY: ${M14_TURN_REST_API_KEY:?set in .env.milestone14}
+      TURN_HOST: ${M14_TURN_HOST:?set in .env.milestone14}
+      TURN_PORT: ${M14_TURN_PORT:-3478}
+      TURN_PROTOCOL: udp
+      TURN_TLS: "false"
+      TURN_TTL: "3600"
+    expose: ["8008"]
+    networks: [stream]
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /root/.gunicorn
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8008), timeout=2).close()"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  coturn:
+    image: coturn/coturn:4.17.2-r0-debian@sha256:aa68aab64a3b929d57fc2924c98ea447bf996cf8dade2508e7b71eaf23f1f14e
+    command:
+      - -n
+      - --log-file=stdout
+      - --external-ip=$$(detect-external-ip)
+      - --allowed-peer-ip=$$(detect-external-ip)
+      - --listening-ip=0.0.0.0
+      - --listening-port=3478
+      - --tls-listening-port=5349
+      - --min-port=49160
+      - --max-port=49200
+      - --realm=${M14_TURN_REALM:?set in .env.milestone14}
+      - --server-name=${M14_TURN_HOST:?set in .env.milestone14}
+      - --use-auth-secret
+      - --static-auth-secret=${M14_TURN_SHARED_SECRET:?set in .env.milestone14}
+      - --fingerprint
+      - --unauthorized-ratelimit
+      - --stale-nonce=600
+      - --user-quota=8
+      - --total-quota=40
+      - --max-bps=12000000
+      - --pidfile=/tmp/turnserver.pid
+      - --no-multicast-peers
+      - --no-tcp-relay
+      - --cert=/run/secrets/tls_cert
+      - --pkey=/run/secrets/tls_key
+    ports:
+      - "${M14_BIND_ADDRESS:-0.0.0.0}:${M14_TURN_PORT:-3478}:3478/tcp"
+      - "${M14_BIND_ADDRESS:-0.0.0.0}:${M14_TURN_PORT:-3478}:3478/udp"
+      - "${M14_BIND_ADDRESS:-0.0.0.0}:${M14_TURN_TLS_PORT:-5349}:5349/tcp"
+      - "${M14_BIND_ADDRESS:-0.0.0.0}:49160-49200:49160-49200/udp"
+    secrets:
+      - tls_cert
+      - tls_key
+    networks:
+      stream:
+        aliases:
+          - ${M14_TURN_HOST:?set in .env.milestone14}
+      turn-public: {}
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/lib/coturn
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD-SHELL", "turnutils_stunclient -p 3478 127.0.0.1 >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+networks:
+  turn-public: {}
+
+secrets:
+  tls_cert:
+    file: ${M14_TLS_CERT_FILE:?set in .env.milestone14}
+  tls_key:
+    file: ${M14_TLS_KEY_FILE:?set in .env.milestone14}

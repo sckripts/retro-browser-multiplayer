@@ -1,0 +1,1 @@
+"""RetroArch coordination boundary."""

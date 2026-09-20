@@ -1,0 +1,7 @@
+services:
+  retro-session:
+    gpus: all
+    environment:
+      SELKIES_USE_CPU: "false"
+      SELKIES_AUTO_GPU: nvidia
+      NVIDIA_DRIVER_CAPABILITIES: compute,graphics,utility,video

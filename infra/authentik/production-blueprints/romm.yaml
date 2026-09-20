@@ -1,0 +1,106 @@
+version: 1
+metadata:
+  name: Retro Browser - RomM OIDC
+entries:
+  - id: romm-email-scope
+    model: authentik_providers_oauth2.scopemapping
+    identifiers:
+      name: Retro Browser RomM verified email
+    attrs:
+      name: Retro Browser RomM verified email
+      scope_name: email
+      description: Email claims for administratively provisioned, verified users
+      expression: |
+        return {
+            "email": request.user.email,
+            "email_verified": request.user.attributes.get("email_verified", False),
+        }
+
+  - id: romm-email-login-flow
+    model: authentik_flows.flow
+    identifiers:
+      slug: retrobrowser-email-login
+    attrs:
+      name: Retro Browser email sign-in
+      title: Sign in to Retro Browser
+      designation: authentication
+      authentication: require_unauthenticated
+
+  - id: romm-email-identification
+    model: authentik_stages_identification.identificationstage
+    identifiers:
+      name: retrobrowser-email-identification
+    attrs:
+      user_fields: [email]
+      case_insensitive_matching: true
+      pretend_user_exists: true
+      show_matched_user: false
+
+  - id: romm-email-magic-link
+    model: authentik_stages_email.emailstage
+    identifiers:
+      name: retrobrowser-email-magic-link
+    attrs:
+      use_global_settings: true
+      token_expiry: minutes=10
+      subject: Retro Browser sign-in link
+      template: email/account_confirmation.html
+      activate_user_on_success: false
+      recovery_max_attempts: 5
+      recovery_cache_timeout: minutes=5
+
+  - id: romm-email-user-login
+    model: authentik_stages_user_login.userloginstage
+    identifiers:
+      name: retrobrowser-email-user-login
+
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf romm-email-login-flow
+      stage: !KeyOf romm-email-identification
+      order: 10
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf romm-email-login-flow
+      stage: !KeyOf romm-email-magic-link
+      order: 20
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf romm-email-login-flow
+      stage: !KeyOf romm-email-user-login
+      order: 100
+
+  - id: romm-oidc-provider
+    model: authentik_providers_oauth2.oauth2provider
+    identifiers:
+      name: Retro Browser RomM OIDC
+    attrs:
+      authentication_flow: !KeyOf romm-email-login-flow
+      authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+      invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+      client_type: confidential
+      client_id: !Env [OIDC_CLIENT_ID, null]
+      client_secret: !Env [OIDC_CLIENT_SECRET, null]
+      grant_types: [authorization_code, refresh_token]
+      redirect_uris:
+        - url: !Env [ROMM_CALLBACK_URL, null]
+          matching_mode: strict
+      sub_mode: hashed_user_id
+      issuer_mode: per_provider
+      include_claims_in_id_token: true
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
+        - !KeyOf romm-email-scope
+
+  - id: romm-application
+    model: authentik_core.application
+    identifiers:
+      slug: romm
+    attrs:
+      name: RomM
+      slug: romm
+      provider: !KeyOf romm-oidc-provider
+      policy_engine_mode: all
+      meta_launch_url: !Env [ROMM_LOGIN_URL, null]

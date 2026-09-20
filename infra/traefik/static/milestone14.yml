@@ -1,0 +1,36 @@
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+entryPoints:
+  http:
+    address: ":8080"
+    http:
+      aliasHeadersStrategy: reject
+      redirections:
+        entryPoint:
+          to: web
+          scheme: https
+          permanent: true
+  web:
+    address: ":8443"
+    http:
+      aliasHeadersStrategy: reject
+      tls:
+        options: milestone14@file
+
+providers:
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+api:
+  dashboard: false
+
+ping:
+  entryPoint: http
+
+log:
+  level: INFO
+
+# Access logging is disabled because Selkies bootstrap URLs contain scoped tokens.

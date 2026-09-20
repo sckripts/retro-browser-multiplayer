@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "session_id": "50000000-0000-4000-8000-000000000005",
+  "participant_id": "50000000-0000-4000-8000-000000000001",
+  "user_id": "milestone5-host",
+  "player_name": "RetroHost",
+  "game": {
+    "canonical_path": "/run/roms/milestone2.nes",
+    "expected_sha256": "847155bb712e474f71554174c9d9ed402bf651b13ff1e4afc9a42ec69cd03d8d"
+  },
+  "emulator": {
+    "core_profile": "nes-milestone2"
+  },
+  "netplay": {
+    "role": "host",
+    "host": null,
+    "port": 55435
+  },
+  "stream": {
+    "subfolder": "/stream/m5-host",
+    "display_profile": "hd-720p60"
+  }
+}

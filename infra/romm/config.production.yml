@@ -1,0 +1,4 @@
+emulatorjs:
+  # Keep server-side cartridge synchronization disabled until restore behavior
+  # has passed the production acceptance matrix.
+  auto_save_sync: false

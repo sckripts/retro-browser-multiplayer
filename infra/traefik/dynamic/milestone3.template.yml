@@ -1,0 +1,42 @@
+tls:
+  options:
+    milestone3:
+      minVersion: VersionTLS12
+      sniStrict: true
+  certificates:
+    - certFile: /run/secrets/tls_cert
+      keyFile: /run/secrets/tls_key
+
+http:
+  routers:
+    milestone3-selkies:
+      entryPoints:
+        - websecure
+      rule: Host(`__M3_PUBLIC_HOSTNAME__`) && PathPrefix(`/stream/m3`)
+      service: milestone3-selkies
+      middlewares:
+        - milestone3-response-headers
+      tls:
+        options: milestone3
+
+  middlewares:
+    milestone3-response-headers:
+      headers:
+        contentTypeNosniff: true
+        forceSTSHeader: true
+        stsIncludeSubdomains: true
+        stsSeconds: 31536000
+        customResponseHeaders:
+          Referrer-Policy: no-referrer
+          X-Robots-Tag: noindex, nofollow
+
+  services:
+    milestone3-selkies:
+      loadBalancer:
+        passHostHeader: true
+        healthCheck:
+          path: /stream/m3/api/health
+          interval: 5s
+          timeout: 2s
+        servers:
+          - url: http://retro-session:8080

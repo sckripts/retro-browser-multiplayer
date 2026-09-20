@@ -1,0 +1,13 @@
+{
+  "folders": [
+    { "name": "retro-browser-multiplayer", "path": "." },
+    { "name": "romm-fork", "path": "../romm" }
+  ],
+  "settings": {
+    "python.defaultInterpreterPath": "${workspaceFolder:retro-browser-multiplayer}\\.venv\\Scripts\\python.exe",
+    "python.testing.pytestEnabled": true,
+    "python.testing.unittestEnabled": false,
+    "editor.formatOnSave": true,
+    "files.eol": "\n"
+  }
+}

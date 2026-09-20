@@ -1,0 +1,51 @@
+tls:
+  options:
+    milestone14:
+      minVersion: VersionTLS12
+      sniStrict: true
+  certificates:
+    - certFile: /run/secrets/tls_cert
+      keyFile: /run/secrets/tls_key
+
+http:
+  routers:
+    milestone14-authentik:
+      entryPoints: [web]
+      rule: Host(`__M14_AUTH_HOSTNAME__`)
+      service: milestone14-authentik
+      middlewares: [milestone14-response-headers]
+
+    milestone14-romm:
+      entryPoints: [web]
+      rule: Host(`__M14_PUBLIC_HOSTNAME__`) && PathPrefix(`/`)
+      priority: 1
+      service: milestone14-romm
+      middlewares: [milestone14-response-headers]
+
+  middlewares:
+    milestone14-response-headers:
+      headers:
+        contentTypeNosniff: true
+        forceSTSHeader: true
+        stsIncludeSubdomains: true
+        stsSeconds: 31536000
+        customResponseHeaders:
+          Referrer-Policy: no-referrer
+          X-Robots-Tag: noindex, nofollow
+
+  services:
+    milestone14-authentik:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: http://authentik-server:9000
+
+    milestone14-romm:
+      loadBalancer:
+        passHostHeader: true
+        healthCheck:
+          path: /api/heartbeat
+          interval: 10s
+          timeout: 3s
+        servers:
+          - url: http://romm:8080

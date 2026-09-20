@@ -1,0 +1,5 @@
+emulatorjs:
+  # Server-side cartridge sync remains disabled after live upload succeeded
+  # but clean relaunch restoration failed. EmulatorJS browser-local saves stay
+  # available while the end-to-end restore path is redesigned and retested.
+  auto_save_sync: false

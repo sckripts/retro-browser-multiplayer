@@ -1,0 +1,25 @@
+name: retro-browser-milestone14
+
+# Production-hardening extension of the accepted Milestone 18 stack.
+services:
+  runtime-agent:
+    image: retrobrowser/runtime-agent:milestone19
+    environment:
+      RUNTIME_AGENT_MEMORY_BYTES: ${M19_RUNTIME_MEMORY_BYTES:-4294967296}
+      RUNTIME_AGENT_NANO_CPUS: ${M19_RUNTIME_NANO_CPUS:-2000000000}
+      RUNTIME_AGENT_PIDS_LIMIT: ${M19_RUNTIME_PIDS_LIMIT:-1024}
+      RUNTIME_AGENT_MAX_RUNTIMES: ${M19_RUNTIME_CAPACITY:-8}
+
+  session-manager:
+    image: retrobrowser/session-manager:milestone19
+    environment:
+      SESSION_MANAGER_RUNTIME_CAPACITY: ${M19_RUNTIME_CAPACITY:-8}
+      SESSION_MANAGER_SESSION_CAPACITY: ${M19_SESSION_CAPACITY:-4}
+      SESSION_MANAGER_PER_USER_RUNTIME_CAPACITY: ${M19_PER_USER_RUNTIME_CAPACITY:-1}
+
+  romm:
+    volumes:
+      - ../../romm/config.milestone19.yml:/romm/config/config.yml:ro
+
+  network-anchor:
+    image: retrobrowser/runtime-agent:milestone19

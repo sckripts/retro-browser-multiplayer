@@ -1,0 +1,150 @@
+name: retro-browser-milestone5
+
+x-runtime-environment: &runtime-environment
+  START_LXQT: "false"
+  SELKIES_ALLOWED_ORIGINS: ${M5_ALLOWED_ORIGINS:-}
+  SELKIES_ENABLE_HTTPS: "false"
+  SELKIES_ENABLE_BASIC_AUTH: "false"
+  SELKIES_MODE: websockets
+  SELKIES_ENABLE_DUAL_MODE: "false"
+  SELKIES_ENCODER: h264enc
+  SELKIES_USE_CPU: "true"
+  SELKIES_AUTO_GPU: "false"
+  SELKIES_FRAMERATE: 60-60
+  SELKIES_MANUAL_RESOLUTION: "true"
+  SELKIES_MANUAL_WIDTH: "1280"
+  SELKIES_MANUAL_HEIGHT: "720"
+  SELKIES_ENABLE_RESIZE: "false"
+  SELKIES_SECOND_SCREEN: "false"
+  SELKIES_AUDIO_ENABLED: "true"
+  SELKIES_MICROPHONE_ENABLED: "false"
+  SELKIES_GAMEPAD_ENABLED: "true"
+  SELKIES_UINPUT_GAMEPAD: "false"
+  SELKIES_WEBCAM_ENABLED: "false"
+  SELKIES_WEBCAM_DEVICE: "false"
+  SELKIES_WEBCAM_PIPEWIRE: "false"
+  SELKIES_ENABLE_CLIPBOARD: "false"
+  SELKIES_ENABLE_BINARY_CLIPBOARD: "false"
+  SELKIES_COMMAND_ENABLED: "false"
+  SELKIES_FILE_TRANSFERS: none
+  SELKIES_ENABLE_SHARING: "false"
+  SELKIES_ENABLE_COLLAB: "false"
+  SELKIES_UI_SIDEBAR_SHOW_CLIPBOARD: "false"
+  SELKIES_UI_SIDEBAR_SHOW_FILES: "false"
+  SELKIES_UI_SIDEBAR_SHOW_SHARING: "false"
+  SELKIES_UI_SIDEBAR_SHOW_WEBCAM: "false"
+  SELKIES_ENABLE_INTERNAL_TURN: "false"
+
+x-runtime-common: &runtime-common
+  image: retrobrowser/retro-session:milestone5
+  init: true
+  shm_size: 2gb
+  expose:
+    - "8080"
+  healthcheck:
+    interval: 5s
+    timeout: 3s
+    retries: 30
+    start_period: 45s
+
+services:
+  edge:
+    image: traefik:v3.7.12@sha256:9c2a54d87f76f5c2f5f2682c68394af92fb12c0a2686798d6462a3f84bd78eaf
+    command:
+      - --configFile=/etc/traefik/traefik.yml
+    ports:
+      - "${M5_BIND_ADDRESS:-0.0.0.0}:${M5_HTTP_PORT:-8090}:8080"
+    volumes:
+      - ../../traefik/static/milestone5.yml:/etc/traefik/traefik.yml:ro
+      - ../../traefik/dynamic/milestone5.yml:/etc/traefik/dynamic/milestone5.yml:ro
+    depends_on:
+      retro-host:
+        condition: service_healthy
+      retro-client:
+        condition: service_healthy
+    networks:
+      - edge
+      - host-stream
+      - client-stream
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  retro-host:
+    <<: *runtime-common
+    build:
+      context: ../../..
+      dockerfile: images/retro-session/Dockerfile
+    environment:
+      <<: *runtime-environment
+      SELKIES_MASTER_TOKEN: ${M5_HOST_MASTER_TOKEN:?set M5_HOST_MASTER_TOKEN}
+      SELKIES_SUBFOLDER: /stream/m5-host
+    volumes:
+      - type: bind
+        source: ${M5_ROM_PATH:?set M5_ROM_PATH to the fetched legal test ROM}
+        target: /run/roms/milestone2.nes
+        read_only: true
+      - type: bind
+        source: ../../../images/retro-session/specs/milestone5-host.json
+        target: /run/retro-session/runtime-spec.json
+        read_only: true
+    expose:
+      - "8080"
+      - "55435"
+    networks:
+      - host-stream
+      - retro-net
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          pgrep -x retroarch >/dev/null &&
+          python3 -c "import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8080/stream/m5-host/api/health', timeout=2)"
+
+  retro-client:
+    <<: *runtime-common
+    environment:
+      <<: *runtime-environment
+      SELKIES_MASTER_TOKEN: ${M5_CLIENT_MASTER_TOKEN:?set M5_CLIENT_MASTER_TOKEN}
+      SELKIES_SUBFOLDER: /stream/m5-client
+    volumes:
+      - type: bind
+        source: ${M5_ROM_PATH:?set M5_ROM_PATH to the fetched legal test ROM}
+        target: /run/roms/milestone2.nes
+        read_only: true
+      - type: bind
+        source: ../../../images/retro-session/specs/milestone5-client.json
+        target: /run/retro-session/runtime-spec.json
+        read_only: true
+    depends_on:
+      retro-host:
+        condition: service_healthy
+    networks:
+      - client-stream
+      - retro-net
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          pgrep -x retroarch >/dev/null &&
+          python3 -c "import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8080/stream/m5-client/api/health', timeout=2)"
+
+networks:
+  edge: {}
+  host-stream:
+    internal: true
+  client-stream:
+    internal: true
+  retro-net:
+    internal: true

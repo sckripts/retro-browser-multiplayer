@@ -1,0 +1,133 @@
+tls:
+  options:
+    milestone14:
+      minVersion: VersionTLS12
+      sniStrict: true
+  certificates:
+    - certFile: /run/secrets/tls_cert
+      keyFile: /run/secrets/tls_key
+
+http:
+  routers:
+    milestone19-authentik-static:
+      entryPoints: [web]
+      rule: Host(`__M14_AUTH_HOSTNAME__`) && PathPrefix(`/static/`)
+      priority: 20
+      service: milestone19-authentik
+      middlewares: [milestone19-auth-static-chain]
+
+    milestone19-authentik:
+      entryPoints: [web]
+      rule: Host(`__M14_AUTH_HOSTNAME__`)
+      priority: 1
+      service: milestone19-authentik
+      middlewares: [milestone19-auth-chain]
+
+    milestone19-romm:
+      entryPoints: [web]
+      rule: Host(`__M14_PUBLIC_HOSTNAME__`) && PathPrefix(`/`)
+      priority: 1
+      service: milestone19-romm
+      middlewares: [milestone19-romm-chain]
+
+    milestone19-romm-progress:
+      entryPoints: [web]
+      rule: >-
+        Host(`__M14_PUBLIC_HOSTNAME__`) &&
+        (PathPrefix(`/api/saves`) || PathPrefix(`/api/states`))
+      priority: 20
+      service: milestone19-romm
+      middlewares: [milestone19-romm-progress-chain]
+
+  middlewares:
+    milestone19-auth-static-chain:
+      chain:
+        middlewares: [milestone19-security-headers, milestone19-auth-csp, milestone19-auth-static-limit, milestone19-auth-body]
+    milestone19-auth-chain:
+      chain:
+        middlewares: [milestone19-security-headers, milestone19-auth-csp, milestone19-auth-limit, milestone19-auth-body]
+    milestone19-romm-chain:
+      chain:
+        middlewares: [milestone19-security-headers, milestone19-romm-csp, milestone19-romm-limit, milestone19-romm-body]
+    milestone19-romm-progress-chain:
+      chain:
+        middlewares: [milestone19-security-headers, milestone19-romm-csp, milestone19-progress-limit, milestone19-progress-inflight, milestone19-progress-body]
+    milestone19-security-headers:
+      headers:
+        contentTypeNosniff: true
+        forceSTSHeader: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+        permissionsPolicy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+        customResponseHeaders:
+          Referrer-Policy: no-referrer
+          X-Robots-Tag: noindex, nofollow
+    milestone19-auth-csp:
+      headers:
+        contentSecurityPolicyReportOnly: >-
+          default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self';
+          img-src 'self' data:; media-src 'none'; connect-src 'self';
+          font-src 'self' data:; worker-src 'self';
+          script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'
+    milestone19-romm-csp:
+      headers:
+        contentSecurityPolicyReportOnly: >-
+          default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self';
+          img-src 'self' data: blob: https:; media-src 'self' data: blob:;
+          connect-src 'self' blob: https: wss:; font-src 'self' data:;
+          worker-src 'self' blob:;
+          script-src 'self' blob: 'unsafe-inline' 'unsafe-eval';
+          style-src 'self' 'unsafe-inline'
+    milestone19-auth-limit:
+      rateLimit:
+        average: 5
+        period: 1s
+        burst: 20
+    milestone19-auth-static-limit:
+      rateLimit:
+        average: 50
+        period: 1s
+        burst: 200
+    milestone19-romm-limit:
+      rateLimit:
+        average: 20
+        period: 1s
+        burst: 40
+    milestone19-progress-limit:
+      rateLimit:
+        average: 2
+        period: 1s
+        burst: 4
+    milestone19-progress-inflight:
+      inFlightReq:
+        amount: 4
+    milestone19-auth-body:
+      buffering:
+        maxRequestBodyBytes: 65536
+        memRequestBodyBytes: 65536
+    milestone19-romm-body:
+      buffering:
+        maxRequestBodyBytes: 1048576
+        memRequestBodyBytes: 1048576
+    milestone19-progress-body:
+      buffering:
+        maxRequestBodyBytes: 33554432
+        memRequestBodyBytes: 1048576
+
+  services:
+    milestone19-authentik:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: http://authentik-server:9000
+
+    milestone19-romm:
+      loadBalancer:
+        passHostHeader: true
+        healthCheck:
+          path: /api/heartbeat
+          interval: 10s
+          timeout: 3s
+        servers:
+          - url: http://romm:8080

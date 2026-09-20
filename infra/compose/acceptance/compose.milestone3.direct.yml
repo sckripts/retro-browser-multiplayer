@@ -1,0 +1,9 @@
+services:
+  retro-session:
+    environment:
+      SELKIES_TURN_REST_URI: ""
+      SELKIES_TURN_REST_API_KEY: ""
+      SELKIES_TURN_HOST: ""
+      SELKIES_TURN_SHARED_SECRET: ""
+      SELKIES_STUN_HOST: ${M3_TURN_HOST:?set M3_TURN_HOST}
+      SELKIES_STUN_PORT: ${M3_TURN_PORT:-3478}

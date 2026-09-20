@@ -1,0 +1,62 @@
+tls:
+  options:
+    milestone5:
+      minVersion: VersionTLS12
+      sniStrict: true
+  certificates:
+    - certFile: /run/secrets/tls_cert
+      keyFile: /run/secrets/tls_key
+
+http:
+  routers:
+    milestone5-host:
+      entryPoints:
+        - websecure
+      rule: Host(`__M5_PUBLIC_HOSTNAME__`) && PathPrefix(`/stream/m5-host`)
+      service: milestone5-host
+      middlewares:
+        - milestone5-response-headers
+      tls:
+        options: milestone5
+
+    milestone5-client:
+      entryPoints:
+        - websecure
+      rule: Host(`__M5_PUBLIC_HOSTNAME__`) && PathPrefix(`/stream/m5-client`)
+      service: milestone5-client
+      middlewares:
+        - milestone5-response-headers
+      tls:
+        options: milestone5
+
+  middlewares:
+    milestone5-response-headers:
+      headers:
+        contentTypeNosniff: true
+        forceSTSHeader: true
+        stsIncludeSubdomains: true
+        stsSeconds: 31536000
+        customResponseHeaders:
+          Referrer-Policy: no-referrer
+          X-Robots-Tag: noindex, nofollow
+
+  services:
+    milestone5-host:
+      loadBalancer:
+        passHostHeader: true
+        healthCheck:
+          path: /stream/m5-host/api/health
+          interval: 5s
+          timeout: 2s
+        servers:
+          - url: http://retro-host:8080
+
+    milestone5-client:
+      loadBalancer:
+        passHostHeader: true
+        healthCheck:
+          path: /stream/m5-client/api/health
+          interval: 5s
+          timeout: 2s
+        servers:
+          - url: http://retro-client:8080

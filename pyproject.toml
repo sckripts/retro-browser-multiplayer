@@ -1,0 +1,29 @@
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+extend-exclude = ["upstream-reference", "romm"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**/*.py" = ["S101"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+files = [
+  "services/session-manager/src",
+  "services/session-manager/tests",
+  "services/runtime-agent/src",
+  "services/runtime-agent/tests",
+  "images/retro-session/session_entrypoint",
+]
+
+[tool.pytest.ini_options]
+testpaths = [
+  "services/session-manager/tests",
+  "services/runtime-agent/tests",
+  "tests",
+]
+addopts = "--strict-config --strict-markers"

@@ -1,0 +1,271 @@
+name: retro-browser-milestone5-public
+
+x-runtime-environment: &runtime-environment
+  START_LXQT: "false"
+  SELKIES_ALLOWED_ORIGINS: https://${M5_PUBLIC_HOSTNAME:?set M5_PUBLIC_HOSTNAME}
+  SELKIES_ENABLE_HTTPS: "false"
+  SELKIES_ENABLE_BASIC_AUTH: "false"
+  SELKIES_MODE: webrtc
+  SELKIES_ENABLE_DUAL_MODE: "false"
+  SELKIES_ENCODER: h264enc
+  SELKIES_USE_CPU: "true"
+  SELKIES_AUTO_GPU: "false"
+  SELKIES_FRAMERATE: 60-60
+  SELKIES_VIDEO_BITRATE: "8000"
+  SELKIES_MANUAL_RESOLUTION: "true"
+  SELKIES_MANUAL_WIDTH: "1280"
+  SELKIES_MANUAL_HEIGHT: "720"
+  SELKIES_ENABLE_RESIZE: "false"
+  SELKIES_SECOND_SCREEN: "false"
+  SELKIES_AUDIO_ENABLED: "true"
+  SELKIES_MICROPHONE_ENABLED: "false"
+  SELKIES_GAMEPAD_ENABLED: "true"
+  SELKIES_UINPUT_GAMEPAD: "false"
+  SELKIES_WEBCAM_ENABLED: "false"
+  SELKIES_WEBCAM_DEVICE: "false"
+  SELKIES_WEBCAM_PIPEWIRE: "false"
+  SELKIES_ENABLE_CLIPBOARD: "false"
+  SELKIES_ENABLE_BINARY_CLIPBOARD: "false"
+  SELKIES_COMMAND_ENABLED: "false"
+  SELKIES_FILE_TRANSFERS: none
+  SELKIES_ENABLE_SHARING: "false"
+  SELKIES_ENABLE_COLLAB: "false"
+  SELKIES_UI_SIDEBAR_SHOW_CLIPBOARD: "false"
+  SELKIES_UI_SIDEBAR_SHOW_FILES: "false"
+  SELKIES_UI_SIDEBAR_SHOW_SHARING: "false"
+  SELKIES_UI_SIDEBAR_SHOW_WEBCAM: "false"
+  SELKIES_ENABLE_INTERNAL_TURN: "false"
+  SELKIES_TURN_REST_URI: http://turn-rest:8008/
+  SELKIES_TURN_REST_API_KEY: ${M5_TURN_REST_API_KEY:?set M5_TURN_REST_API_KEY}
+  SELKIES_TURN_PROTOCOL: udp
+  SELKIES_TURN_TLS: "false"
+  SELKIES_STUN_HOST: ${M5_TURN_HOST:?set M5_TURN_HOST}
+  SELKIES_STUN_PORT: ${M5_TURN_PORT:-3478}
+  SELKIES_ENABLE_WEBRTC_STATISTICS: "true"
+  SELKIES_WEBRTC_STATISTICS_DIR: /tmp
+
+x-runtime-common: &runtime-common
+  image: retrobrowser/retro-session:milestone5
+  init: true
+  shm_size: 2gb
+  expose:
+    - "8080"
+  healthcheck:
+    interval: 5s
+    timeout: 3s
+    retries: 30
+    start_period: 45s
+
+services:
+  edge:
+    image: traefik:v3.7.12@sha256:9c2a54d87f76f5c2f5f2682c68394af92fb12c0a2686798d6462a3f84bd78eaf
+    user: "65534:65534"
+    command:
+      - --configFile=/etc/traefik/traefik.yml
+    ports:
+      - "${M5_BIND_ADDRESS:-0.0.0.0}:${M5_HTTP_PORT:-80}:8080"
+      - "${M5_BIND_ADDRESS:-0.0.0.0}:${M5_HTTPS_PORT:-443}:8443"
+    volumes:
+      - ../../traefik/static/milestone5-public.yml:/etc/traefik/traefik.yml:ro
+      - ../../traefik/dynamic/generated/milestone5.yml:/etc/traefik/dynamic/milestone5.yml:ro
+    secrets:
+      - tls_cert
+      - tls_key
+    depends_on:
+      retro-host:
+        condition: service_healthy
+      retro-client:
+        condition: service_healthy
+    networks:
+      - edge
+      - host-stream
+      - client-stream
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  retro-host:
+    <<: *runtime-common
+    build:
+      context: ../../..
+      dockerfile: images/retro-session/Dockerfile
+    environment:
+      <<: *runtime-environment
+      SELKIES_MASTER_TOKEN: ${M5_HOST_MASTER_TOKEN:?set M5_HOST_MASTER_TOKEN}
+      SELKIES_SUBFOLDER: /stream/m5-host
+      SELKIES_TURN_REST_USERNAME: m5-host
+    volumes:
+      - type: bind
+        source: ${M5_ROM_PATH:?set M5_ROM_PATH to the fetched legal test ROM}
+        target: /run/roms/milestone2.nes
+        read_only: true
+      - type: bind
+        source: ../../../images/retro-session/specs/milestone5-host.json
+        target: /run/retro-session/runtime-spec.json
+        read_only: true
+    expose:
+      - "8080"
+      - "55435"
+    depends_on:
+      turn-rest:
+        condition: service_healthy
+      coturn:
+        condition: service_healthy
+    networks:
+      - host-stream
+      - retro-net
+      - credential
+      - turn
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          pgrep -x retroarch >/dev/null &&
+          python3 -c "import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8080/stream/m5-host/api/health', timeout=2)"
+
+  retro-client:
+    <<: *runtime-common
+    environment:
+      <<: *runtime-environment
+      SELKIES_MASTER_TOKEN: ${M5_CLIENT_MASTER_TOKEN:?set M5_CLIENT_MASTER_TOKEN}
+      SELKIES_SUBFOLDER: /stream/m5-client
+      SELKIES_TURN_REST_USERNAME: m5-client
+    volumes:
+      - type: bind
+        source: ${M5_ROM_PATH:?set M5_ROM_PATH to the fetched legal test ROM}
+        target: /run/roms/milestone2.nes
+        read_only: true
+      - type: bind
+        source: ../../../images/retro-session/specs/milestone5-client.json
+        target: /run/retro-session/runtime-spec.json
+        read_only: true
+    depends_on:
+      retro-host:
+        condition: service_healthy
+      turn-rest:
+        condition: service_healthy
+      coturn:
+        condition: service_healthy
+    networks:
+      - client-stream
+      - retro-net
+      - credential
+      - turn
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          pgrep -x retroarch >/dev/null &&
+          python3 -c "import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8080/stream/m5-client/api/health', timeout=2)"
+
+  turn-rest:
+    image: ghcr.io/selkies-project/selkies/turn-rest:main@sha256:53e48365eee7a66886a75a9f37a4733895d864703928600bb5e4fa786e977f04
+    environment:
+      TURN_SHARED_SECRET: ${M5_TURN_SHARED_SECRET:?set M5_TURN_SHARED_SECRET}
+      TURN_API_KEY: ${M5_TURN_REST_API_KEY:?set M5_TURN_REST_API_KEY}
+      TURN_HOST: ${M5_TURN_HOST:?set M5_TURN_HOST}
+      TURN_PORT: "3478"
+      TURN_PROTOCOL: "udp"
+      TURN_TLS: "false"
+      TURN_TTL: "3600"
+    expose:
+      - "8008"
+    networks:
+      - credential
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /root/.gunicorn
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8008), timeout=2).close()"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  coturn:
+    image: coturn/coturn:4.17.2-r0-debian@sha256:aa68aab64a3b929d57fc2924c98ea447bf996cf8dade2508e7b71eaf23f1f14e
+    command:
+      - -n
+      - --log-file=stdout
+      - --external-ip=$$(detect-external-ip)
+      - --allowed-peer-ip=$$(detect-external-ip)
+      - --listening-ip=0.0.0.0
+      - --listening-port=3478
+      - --tls-listening-port=5349
+      - --min-port=49160
+      - --max-port=49200
+      - --realm=${M5_TURN_REALM:?set M5_TURN_REALM}
+      - --server-name=${M5_TURN_HOST:?set M5_TURN_HOST}
+      - --use-auth-secret
+      - --static-auth-secret=${M5_TURN_SHARED_SECRET:?set M5_TURN_SHARED_SECRET}
+      - --fingerprint
+      - --unauthorized-ratelimit
+      - --stale-nonce=600
+      - --user-quota=4
+      - --total-quota=20
+      - --max-bps=2000000
+      - --pidfile=/tmp/turnserver.pid
+      - --no-multicast-peers
+      - --no-tcp-relay
+      - --cert=/run/secrets/tls_cert
+      - --pkey=/run/secrets/tls_key
+    ports:
+      - "${M5_BIND_ADDRESS:-0.0.0.0}:${M5_TURN_PORT:-3478}:3478/tcp"
+      - "${M5_BIND_ADDRESS:-0.0.0.0}:${M5_TURN_PORT:-3478}:3478/udp"
+      - "${M5_BIND_ADDRESS:-0.0.0.0}:${M5_TURN_TLS_PORT:-5349}:5349/tcp"
+      - "${M5_BIND_ADDRESS:-0.0.0.0}:49160-49200:49160-49200/udp"
+    secrets:
+      - tls_cert
+      - tls_key
+    networks:
+      turn:
+        aliases:
+          - ${M5_TURN_HOST:?set M5_TURN_HOST}
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/lib/coturn
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "turnutils_stunclient -p 3478 127.0.0.1 >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+networks:
+  edge: {}
+  host-stream:
+    internal: true
+  client-stream:
+    internal: true
+  retro-net:
+    internal: true
+  credential:
+    internal: true
+  turn: {}
+
+secrets:
+  tls_cert:
+    file: ${M5_TLS_CERT_FILE:?set M5_TLS_CERT_FILE}
+  tls_key:
+    file: ${M5_TLS_KEY_FILE:?set M5_TLS_KEY_FILE}

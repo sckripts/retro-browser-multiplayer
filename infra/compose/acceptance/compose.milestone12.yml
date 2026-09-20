@@ -1,0 +1,44 @@
+name: retro-browser-milestone12
+
+# Overlay the accepted Milestone 10 runtime and Milestone 11 identity stacks:
+# docker compose -f compose.milestone10.yml -f compose.milestone11.yml -f compose.milestone12.yml
+services:
+  runtime-agent:
+    image: retrobrowser/runtime-agent:milestone12
+    environment:
+      RUNTIME_AGENT_APPROVED_NETWORKS: retrobrowser-m10-stream,retrobrowser-m10-retro-net
+      RUNTIME_AGENT_ALLOWED_ORIGINS: ${M12_ROMM_URL:?set in .env.milestone12}
+
+  session-manager:
+    image: retrobrowser/session-manager:milestone12
+    environment:
+      SESSION_MANAGER_ROMM_API_URL: http://romm:8080/api
+      SESSION_MANAGER_ROMM_SERVICE_TOKEN: ${M10_SERVICE_TOKEN:?set in .env.milestone12}
+    depends_on:
+      romm:
+        condition: service_healthy
+
+  romm:
+    image: ${M12_ROMM_IMAGE:?set in .env.milestone12}
+    environment:
+      ROMM_BASE_URL: ${M12_ROMM_URL:?set in .env.milestone12}
+      EXTERNAL_MULTIPLAYER_ENABLED: "true"
+      EXTERNAL_MULTIPLAYER_URL: http://session-manager:8080
+      EXTERNAL_MULTIPLAYER_TOKEN: ${M10_SERVICE_TOKEN:?set in .env.milestone12}
+      EXTERNAL_MULTIPLAYER_TIMEOUT: "240"
+    networks:
+      - control
+    ports: !reset []
+    volumes:
+      - type: bind
+        source: ${M10_DOCKER_ROM_ROOT:?set in .env.milestone12}
+        target: /romm/library
+
+  edge:
+    ports: !override
+      - "127.0.0.1:8096:8080"
+    networks:
+      - control
+
+  network-anchor:
+    image: retrobrowser/runtime-agent:milestone12

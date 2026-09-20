@@ -1,0 +1,16 @@
+from typing import Protocol
+from uuid import UUID
+
+from retro_sessions.models.domain import Session
+
+
+class SessionRepository(Protocol):
+    def add(self, session: Session) -> None: ...
+
+    def get(self, session_id: UUID) -> Session | None: ...
+
+    def list(self) -> list[Session]: ...
+
+    def save(self, session: Session, *, expected_revision: int) -> None: ...
+
+    def health(self) -> bool: ...

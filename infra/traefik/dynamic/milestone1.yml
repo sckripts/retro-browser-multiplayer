@@ -1,0 +1,28 @@
+http:
+  routers:
+    milestone1-selkies:
+      entryPoints:
+        - web
+      rule: PathPrefix(`/stream/m1`)
+      service: milestone1-selkies
+      middlewares:
+        - milestone1-response-headers
+
+  middlewares:
+    milestone1-response-headers:
+      headers:
+        contentTypeNosniff: true
+        customResponseHeaders:
+          Referrer-Policy: no-referrer
+          X-Robots-Tag: noindex, nofollow
+
+  services:
+    milestone1-selkies:
+      loadBalancer:
+        passHostHeader: true
+        healthCheck:
+          path: /stream/m1/api/health
+          interval: 5s
+          timeout: 2s
+        servers:
+          - url: http://selkies:8080

@@ -1,0 +1,27 @@
+{
+  "annotations":{"list":[]},
+  "editable":false,
+  "fiscalYearStartMonth":0,
+  "graphTooltip":1,
+  "id":null,
+  "links":[],
+  "panels":[
+    {"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"fieldConfig":{"defaults":{"unit":"short"},"overrides":[]},"gridPos":{"h":5,"w":6,"x":0,"y":0},"id":1,"options":{"colorMode":"value","graphMode":"area","justifyMode":"auto","orientation":"auto","reduceOptions":{"calcs":["lastNotNull"],"fields":"","values":false},"textMode":"auto","wideLayout":true},"targets":[{"expr":"sum(retrobrowser_sessions{state=~\"OPEN|RUNNING\"})","refId":"A"}],"title":"Active sessions","type":"stat"},
+    {"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"fieldConfig":{"defaults":{"max":100,"min":0,"unit":"percent"},"overrides":[]},"gridPos":{"h":5,"w":6,"x":6,"y":0},"id":2,"options":{"orientation":"auto","reduceOptions":{"calcs":["lastNotNull"],"fields":"","values":false},"showThresholdLabels":false,"showThresholdMarkers":true},"targets":[{"expr":"100 * retrobrowser_runtime_used / retrobrowser_runtime_capacity","refId":"A"}],"title":"Runtime capacity used","type":"gauge"},
+    {"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"fieldConfig":{"defaults":{"unit":"fps"},"overrides":[]},"gridPos":{"h":8,"w":12,"x":12,"y":0},"id":3,"options":{"legend":{"displayMode":"table","placement":"bottom","showLegend":true},"tooltip":{"mode":"multi","sort":"desc"}},"targets":[{"expr":"fps{job=\"selkies\"}","legendFormat":"{{session_id}} / {{participant_id}}","refId":"A"}],"title":"Browser-observed FPS","type":"timeseries"},
+    {"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"fieldConfig":{"defaults":{"unit":"ms"},"overrides":[]},"gridPos":{"h":8,"w":12,"x":0,"y":5},"id":4,"options":{"legend":{"displayMode":"table","placement":"bottom","showLegend":true},"tooltip":{"mode":"multi","sort":"desc"}},"targets":[{"expr":"latency{job=\"selkies\"}","legendFormat":"{{session_id}} / {{participant_id}}","refId":"A"}],"title":"WebRTC client latency","type":"timeseries"},
+    {"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"fieldConfig":{"defaults":{"unit":"short"},"overrides":[]},"gridPos":{"h":8,"w":12,"x":12,"y":8},"id":5,"options":{"legend":{"displayMode":"table","placement":"bottom","showLegend":true},"tooltip":{"mode":"multi","sort":"desc"}},"targets":[{"expr":"sum by (category) (rate(retrobrowser_session_manager_errors_total[5m]))","legendFormat":"{{category}}","refId":"A"}],"title":"Structured errors / second","type":"timeseries"},
+    {"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"fieldConfig":{"defaults":{"unit":"s"},"overrides":[]},"gridPos":{"h":8,"w":12,"x":0,"y":13},"id":6,"options":{"legend":{"displayMode":"table","placement":"bottom","showLegend":true},"tooltip":{"mode":"multi","sort":"desc"}},"targets":[{"expr":"histogram_quantile(0.95, sum by (le, operation) (rate(retrobrowser_session_manager_request_duration_seconds_bucket[5m])))","legendFormat":"{{operation}}","refId":"A"}],"title":"Session API p95 latency","type":"timeseries"},
+    {"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"fieldConfig":{"defaults":{"unit":"short"},"overrides":[]},"gridPos":{"h":8,"w":12,"x":12,"y":16},"id":7,"options":{"legend":{"displayMode":"table","placement":"bottom","showLegend":true},"tooltip":{"mode":"multi","sort":"desc"}},"targets":[{"expr":"{job=\"coturn\",__name__=~\"turn_total_allocations|turn_active_allocations|turn_traffic.*\"}","legendFormat":"{{__name__}}","refId":"A"}],"title":"TURN allocations and traffic","type":"timeseries"},
+    {"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"fieldConfig":{"defaults":{"unit":"percent"},"overrides":[]},"gridPos":{"h":8,"w":12,"x":0,"y":21},"id":8,"options":{"legend":{"displayMode":"table","placement":"bottom","showLegend":true},"tooltip":{"mode":"multi","sort":"desc"}},"targets":[{"expr":"gpu_utilization{job=\"selkies\"}","legendFormat":"{{session_id}} / {{participant_id}}","refId":"A"}],"title":"Runtime encoder GPU utilization","type":"timeseries"}
+  ],
+  "refresh":"10s",
+  "schemaVersion":42,
+  "tags":["retrobrowser","milestone-18"],
+  "templating":{"list":[{"current":{},"hide":2,"includeAll":false,"label":"Datasource","multi":false,"name":"DS_PROMETHEUS","options":[],"query":"prometheus","refresh":1,"regex":"","skipUrlSync":false,"type":"datasource"}]},
+  "time":{"from":"now-1h","to":"now"},
+  "timezone":"browser",
+  "title":"RetroBrowser Operations",
+  "uid":"retrobrowser-operations",
+  "version":1
+}

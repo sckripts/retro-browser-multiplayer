@@ -1,0 +1,34 @@
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+entryPoints:
+  web:
+    address: ":8080"
+    http:
+      aliasHeadersStrategy: reject
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":8443"
+    http:
+      aliasHeadersStrategy: reject
+
+providers:
+  file:
+    filename: /etc/traefik/dynamic/milestone5.yml
+    watch: true
+
+api:
+  dashboard: false
+
+ping:
+  entryPoint: web
+
+log:
+  level: INFO
+
+# Access logging is absent because bootstrap URLs contain controller tokens.

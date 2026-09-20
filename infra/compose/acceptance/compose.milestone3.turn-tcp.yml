@@ -1,0 +1,10 @@
+services:
+  retro-session:
+    environment:
+      SELKIES_TURN_PROTOCOL: tcp
+      SELKIES_TURN_TLS: "false"
+  turn-rest:
+    environment:
+      TURN_PORT: "3478"
+      TURN_PROTOCOL: "tcp"
+      TURN_TLS: "false"

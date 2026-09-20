@@ -1,0 +1,464 @@
+name: retro-browser
+
+x-authentik-environment: &authentik-environment
+  AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?set in .env.production}
+  AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
+  AUTHENTIK_POSTGRESQL__NAME: authentik
+  AUTHENTIK_POSTGRESQL__USER: authentik
+  AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD:?set in .env.production}
+  AUTHENTIK_EMAIL__HOST: ${SMTP_HOST:?set in .env.production}
+  AUTHENTIK_EMAIL__PORT: ${SMTP_PORT:?set in .env.production}
+  AUTHENTIK_EMAIL__USERNAME: ${SMTP_USERNAME:?set in .env.production}
+  AUTHENTIK_EMAIL__PASSWORD: ${SMTP_PASSWORD:?set in .env.production}
+  AUTHENTIK_EMAIL__USE_TLS: ${SMTP_USE_TLS:-true}
+  AUTHENTIK_EMAIL__USE_SSL: ${SMTP_USE_SSL:-false}
+  AUTHENTIK_EMAIL__FROM: ${SMTP_FROM:?set in .env.production}
+  AUTHENTIK_BOOTSTRAP_EMAIL: ${ADMIN_EMAIL:?set in .env.production}
+  AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD:?set in .env.production}
+  AUTHENTIK_BOOTSTRAP_TOKEN: ${AUTHENTIK_BOOTSTRAP_TOKEN:?set in .env.production}
+  OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?set in .env.production}
+  OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?set in .env.production}
+  ROMM_CALLBACK_URL: https://${PUBLIC_HOSTNAME:?set in .env.production}/api/oauth/openid
+  ROMM_LOGIN_URL: https://${PUBLIC_HOSTNAME:?set in .env.production}/api/login/openid
+
+x-authentik-volumes: &authentik-volumes
+  - authentik-media:/media
+  - authentik-templates:/templates
+  - authentik-certs:/certs
+  - ./infra/authentik/production-blueprints:/blueprints/custom:ro
+
+services:
+  runtime-agent:
+    image: ${RUNTIME_AGENT_IMAGE:?set a digest-pinned image in .env.production}
+    depends_on:
+      network-anchor:
+        condition: service_completed_successfully
+    environment:
+      RUNTIME_AGENT_APPROVED_IMAGE: ${RETRO_SESSION_IMAGE:?set a digest-pinned image in .env.production}
+      RUNTIME_AGENT_APPROVED_NETWORKS: retrobrowser-stream,retrobrowser-netplay
+      RUNTIME_AGENT_ROM_ROOT: /srv/retrobrowser/roms
+      RUNTIME_AGENT_USER_DATA_ROOT: /srv/retrobrowser/userdata
+      RUNTIME_AGENT_SAVE_DATA_ROOT: /srv/retrobrowser/saves
+      RUNTIME_AGENT_DOCKER_ROM_ROOT: ${ROM_ROOT:?set an absolute path in .env.production}
+      RUNTIME_AGENT_DOCKER_USER_DATA_ROOT: ${USER_DATA_ROOT:?set an absolute path in .env.production}
+      RUNTIME_AGENT_DOCKER_SAVE_DATA_ROOT: ${SAVE_DATA_ROOT:?set an absolute path in .env.production}
+      RUNTIME_AGENT_MANAGE_USER_DATA_PERMISSIONS: ${MANAGE_USER_DATA_PERMISSIONS:-true}
+      RUNTIME_AGENT_ROUTE_ROOT: /srv/retrobrowser/routes
+      RUNTIME_AGENT_METRICS_TARGET_ROOT: /srv/retrobrowser/metrics-targets
+      RUNTIME_AGENT_ALLOWED_ORIGINS: https://${PUBLIC_HOSTNAME:?set in .env.production}
+      RUNTIME_AGENT_ROUTE_HOST: ${PUBLIC_HOSTNAME:?set in .env.production}
+      RUNTIME_AGENT_GPU_PROFILES: ${GPU_PROFILES:-cpu}
+      RUNTIME_AGENT_STREAM_MODE: webrtc
+      RUNTIME_AGENT_TURN_REST_URI: http://turn-rest:8008/
+      RUNTIME_AGENT_TURN_REST_API_KEY: ${TURN_REST_API_KEY:?set in .env.production}
+      RUNTIME_AGENT_TURN_REST_USERNAME: retrobrowser
+      RUNTIME_AGENT_TURN_PROTOCOL: udp
+      RUNTIME_AGENT_TURN_TLS: "false"
+      RUNTIME_AGENT_STUN_HOST: ${TURN_HOST:?set in .env.production}
+      RUNTIME_AGENT_STUN_PORT: ${TURN_PORT:-3478}
+      RUNTIME_AGENT_MEMORY_BYTES: ${RUNTIME_MEMORY_BYTES:-4294967296}
+      RUNTIME_AGENT_NANO_CPUS: ${RUNTIME_NANO_CPUS:-2000000000}
+      RUNTIME_AGENT_PIDS_LIMIT: ${RUNTIME_PIDS_LIMIT:-1024}
+      RUNTIME_AGENT_MAX_RUNTIMES: ${RUNTIME_CAPACITY:-8}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - type: bind
+        source: ${ROM_ROOT:?set an absolute path in .env.production}
+        target: /srv/retrobrowser/roms
+        read_only: true
+      - type: bind
+        source: ${USER_DATA_ROOT:?set an absolute path in .env.production}
+        target: /srv/retrobrowser/userdata
+      - type: bind
+        source: ${SAVE_DATA_ROOT:?set an absolute path in .env.production}
+        target: /srv/retrobrowser/saves
+      - type: bind
+        source: ${ROUTE_CONFIG_ROOT:?set an absolute path in .env.production}
+        target: /srv/retrobrowser/routes
+      - type: bind
+        source: ${METRICS_TARGET_ROOT:?set an absolute path in .env.production}
+        target: /srv/retrobrowser/metrics-targets
+      - runtime-agent-control:/run/retrobrowser
+    network_mode: none
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    cap_add: [CHOWN]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, python, -m, retro_runtime.client, health]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  session-manager:
+    image: ${SESSION_MANAGER_IMAGE:?set a digest-pinned image in .env.production}
+    depends_on:
+      runtime-agent:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      romm:
+        condition: service_healthy
+    environment:
+      SESSION_MANAGER_SERVICE_TOKEN: ${SERVICE_TOKEN:?set in .env.production}
+      SESSION_MANAGER_ORCHESTRATION_SECRET: ${ORCHESTRATION_SECRET:?set in .env.production}
+      SESSION_MANAGER_RUNTIME_IMAGE: ${RETRO_SESSION_IMAGE:?set a digest-pinned image in .env.production}
+      SESSION_MANAGER_STREAM_NETWORK: retrobrowser-stream
+      SESSION_MANAGER_NETPLAY_NETWORK: retrobrowser-netplay
+      SESSION_MANAGER_GPU_PROFILE: ${DEFAULT_GPU_PROFILE:-cpu}
+      SESSION_MANAGER_ROM_ROOT: /srv/retrobrowser/roms
+      SESSION_MANAGER_ROMM_API_URL: http://romm:8080/api
+      SESSION_MANAGER_ROMM_SERVICE_TOKEN: ${SERVICE_TOKEN:?set in .env.production}
+      SESSION_MANAGER_MAX_SESSION_SECONDS: ${MAX_SESSION_SECONDS:-14400}
+      SESSION_MANAGER_LOBBY_LEASE_SECONDS: ${LOBBY_LEASE_SECONDS:-120}
+      SESSION_MANAGER_IDLE_TIMEOUT_SECONDS: ${IDLE_TIMEOUT_SECONDS:-45}
+      SESSION_MANAGER_CLEANUP_INTERVAL_SECONDS: ${CLEANUP_INTERVAL_SECONDS:-10}
+      SESSION_MANAGER_RUNTIME_CAPACITY: ${RUNTIME_CAPACITY:-8}
+      SESSION_MANAGER_SESSION_CAPACITY: ${SESSION_CAPACITY:-4}
+      SESSION_MANAGER_PER_USER_RUNTIME_CAPACITY: ${PER_USER_RUNTIME_CAPACITY:-1}
+      VALKEY_URL: redis://valkey:6379/0
+    volumes:
+      - runtime-agent-control:/run/retrobrowser
+      - type: bind
+        source: ${ROM_ROOT:?set an absolute path in .env.production}
+        target: /srv/retrobrowser/roms
+        read_only: true
+    networks: [control, stream]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  valkey:
+    image: valkey/valkey:9.1.2-alpine@sha256:a174b894902bd3367e330d47cc2054367dc4917701776aaf336f41d83b65ec7a
+    command: [valkey-server, --save, "", --appendonly, "no"]
+    user: "999:1000"
+    networks: [control]
+    read_only: true
+    tmpfs: [/data]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, valkey-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  network-anchor:
+    image: ${RUNTIME_AGENT_IMAGE:?set a digest-pinned image in .env.production}
+    entrypoint: [python, -c, pass]
+    networks: [stream, retro-net]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  authentik-postgres:
+    image: postgres:16.10-alpine@sha256:029660641a0cfc575b14f336ba448fb8a75fd595d42e1fa316b9fb4378742297
+    environment:
+      POSTGRES_DB: authentik
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD:?set in .env.production}
+    volumes: [authentik-postgres:/var/lib/postgresql/data]
+    networks: [identity]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -d authentik -U authentik]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2026.8.1@sha256:9d605ed569ff9f39146be39da93714b2acf19072acc4ab0f0e2f2d81be88cdce
+    command: server
+    environment: *authentik-environment
+    volumes: *authentik-volumes
+    depends_on:
+      authentik-postgres:
+        condition: service_healthy
+    networks: [identity]
+    healthcheck:
+      test: [CMD, ak, healthcheck]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2026.8.1@sha256:9d605ed569ff9f39146be39da93714b2acf19072acc4ab0f0e2f2d81be88cdce
+    command: worker
+    environment: *authentik-environment
+    volumes: *authentik-volumes
+    depends_on:
+      authentik-postgres:
+        condition: service_healthy
+    networks: [identity]
+    healthcheck:
+      test: [CMD, ak, healthcheck]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+
+  romm-database:
+    image: mariadb:11.8.3@sha256:ae6119716edac6998ae85508431b3d2e666530ddf4e94c61a10710caec9b0f71
+    environment:
+      MARIADB_DATABASE: romm
+      MARIADB_USER: romm
+      MARIADB_PASSWORD: ${ROMM_DB_PASSWORD:?set in .env.production}
+      MARIADB_ROOT_PASSWORD: ${ROMM_DB_ROOT_PASSWORD:?set in .env.production}
+    volumes: [romm-database:/var/lib/mysql]
+    networks: [romm-data]
+    healthcheck:
+      test: [CMD, healthcheck.sh, --connect, --innodb_initialized]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+  romm:
+    image: ${ROMM_IMAGE:?set the digest-pinned integration image in .env.production}
+    depends_on:
+      romm-database:
+        condition: service_healthy
+      authentik-server:
+        condition: service_healthy
+    environment:
+      DB_HOST: romm-database
+      DB_NAME: romm
+      DB_USER: romm
+      DB_PASSWD: ${ROMM_DB_PASSWORD:?set in .env.production}
+      ROMM_AUTH_SECRET_KEY: ${ROMM_AUTH_SECRET_KEY:?set in .env.production}
+      ROMM_BASE_URL: https://${PUBLIC_HOSTNAME:?set in .env.production}
+      OIDC_ENABLED: "true"
+      OIDC_AUTOLOGIN: "false"
+      OIDC_ALLOW_REGISTRATION: "true"
+      OIDC_PROVIDER: authentik
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?set in .env.production}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?set in .env.production}
+      OIDC_REDIRECT_URI: https://${PUBLIC_HOSTNAME:?set in .env.production}/api/oauth/openid
+      OIDC_SERVER_APPLICATION_URL: https://${AUTH_HOSTNAME:?set in .env.production}/application/o/romm
+      OIDC_USERNAME_ATTRIBUTE: sub
+      EXTERNAL_MULTIPLAYER_ENABLED: "true"
+      EXTERNAL_MULTIPLAYER_URL: http://session-manager:8080
+      EXTERNAL_MULTIPLAYER_TOKEN: ${SERVICE_TOKEN:?set in .env.production}
+      EXTERNAL_MULTIPLAYER_TIMEOUT: "240"
+    extra_hosts:
+      - "${AUTH_HOSTNAME:?set in .env.production}:host-gateway"
+    volumes:
+      - romm-resources:/romm/resources
+      - romm-cache:/redis-data
+      - type: bind
+        source: ${ROM_ROOT:?set an absolute path in .env.production}
+        target: /romm/library
+      - romm-assets:/romm/assets
+      - ./infra/romm/config.production.yml:/romm/config/config.yml:ro
+    networks: [control, identity, romm-data]
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, http://localhost:8080/api/heartbeat]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 45s
+    restart: unless-stopped
+
+  edge:
+    image: traefik:v3.7.12@sha256:9c2a54d87f76f5c2f5f2682c68394af92fb12c0a2686798d6462a3f84bd78eaf
+    command: [--configFile=/etc/traefik/traefik.yml]
+    ports:
+      - "${BIND_ADDRESS:-0.0.0.0}:${HTTP_PORT:-80}:8080"
+      - "${BIND_ADDRESS:-0.0.0.0}:${HTTPS_PORT:-443}:8443"
+    volumes:
+      - ./infra/traefik/static/production.yml:/etc/traefik/traefik.yml:ro
+      - type: bind
+        source: ${ROUTE_CONFIG_ROOT:?set an absolute path in .env.production}
+        target: /etc/traefik/dynamic
+        read_only: true
+    secrets: [tls_cert, tls_key]
+    networks: [ingress, control, identity, stream]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+
+  turn-rest:
+    image: ghcr.io/selkies-project/selkies/turn-rest:main@sha256:53e48365eee7a66886a75a9f37a4733895d864703928600bb5e4fa786e977f04
+    environment:
+      TURN_SHARED_SECRET: ${TURN_SHARED_SECRET:?set in .env.production}
+      TURN_API_KEY: ${TURN_REST_API_KEY:?set in .env.production}
+      TURN_HOST: ${TURN_HOST:?set in .env.production}
+      TURN_PORT: ${TURN_PORT:-3478}
+      TURN_PROTOCOL: udp
+      TURN_TLS: "false"
+      TURN_TTL: "3600"
+    expose: ["8008"]
+    networks: [stream]
+    read_only: true
+    tmpfs: [/tmp, /root/.gunicorn]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, python, -c, "import socket; socket.create_connection(('127.0.0.1', 8008), timeout=2).close()"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  coturn:
+    image: coturn/coturn:4.17.2-r0-debian@sha256:aa68aab64a3b929d57fc2924c98ea447bf996cf8dade2508e7b71eaf23f1f14e
+    command:
+      - -n
+      - --log-file=stdout
+      - --external-ip=$$(detect-external-ip)
+      - --allowed-peer-ip=$$(detect-external-ip)
+      - --listening-ip=0.0.0.0
+      - --listening-port=3478
+      - --tls-listening-port=5349
+      - --min-port=${TURN_RELAY_MIN_PORT:-49160}
+      - --max-port=${TURN_RELAY_MAX_PORT:-49200}
+      - --realm=${TURN_REALM:?set in .env.production}
+      - --server-name=${TURN_HOST:?set in .env.production}
+      - --use-auth-secret
+      - --static-auth-secret=${TURN_SHARED_SECRET:?set in .env.production}
+      - --fingerprint
+      - --unauthorized-ratelimit
+      - --stale-nonce=600
+      - --user-quota=8
+      - --total-quota=40
+      - --max-bps=12000000
+      - --pidfile=/tmp/turnserver.pid
+      - --no-multicast-peers
+      - --no-tcp-relay
+      - --cert=/run/secrets/tls_cert
+      - --pkey=/run/secrets/tls_key
+      - --prometheus
+      - --prometheus-address=0.0.0.0
+      - --prometheus-port=9641
+    ports:
+      - "${BIND_ADDRESS:-0.0.0.0}:${TURN_PORT:-3478}:3478/tcp"
+      - "${BIND_ADDRESS:-0.0.0.0}:${TURN_PORT:-3478}:3478/udp"
+      - "${BIND_ADDRESS:-0.0.0.0}:${TURN_TLS_PORT:-5349}:5349/tcp"
+      - "${BIND_ADDRESS:-0.0.0.0}:${TURN_RELAY_MIN_PORT:-49160}-${TURN_RELAY_MAX_PORT:-49200}:${TURN_RELAY_MIN_PORT:-49160}-${TURN_RELAY_MAX_PORT:-49200}/udp"
+    expose: ["9641"]
+    secrets: [tls_cert, tls_key]
+    networks:
+      stream:
+        aliases: ["${TURN_HOST:?set in .env.production}"]
+      turn-public: {}
+    read_only: true
+    tmpfs: [/tmp, /var/lib/coturn]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD-SHELL, "turnutils_stunclient -p 3478 127.0.0.1 >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.7.3@sha256:49214755b6153f90a597adcbff0252cc61069f8ab69ce8411285cd4a560e8038
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}
+    user: "65534:0"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - type: bind
+        source: ${METRICS_TARGET_ROOT:?set an absolute path in .env.production}
+        target: /etc/prometheus/runtime-targets
+        read_only: true
+      - prometheus-data:/prometheus
+    networks: [control, stream, observability]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, wget, --spider, -q, http://127.0.0.1:9090/-/ready]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:12.3.0@sha256:70d9599b186ce287be0d2c5ba9a78acb2e86c1a68c9c41449454d0fc3eeb84e8
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set in .env.production}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SERVER_ENABLE_GZIP: "true"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_PLUGINS_CHECK_FOR_UPDATES: "false"
+    ports:
+      - "${OBSERVABILITY_BIND_ADDRESS:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    networks: [observability, ingress]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD-SHELL, wget --spider -q http://127.0.0.1:3000/api/health]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+networks:
+  ingress: {}
+  identity: {}
+  turn-public: {}
+  control:
+    internal: true
+  romm-data:
+    internal: true
+  observability:
+    internal: true
+  stream:
+    name: retrobrowser-stream
+    internal: true
+  retro-net:
+    name: retrobrowser-netplay
+    internal: true
+
+volumes:
+  runtime-agent-control: {}
+  authentik-postgres: {}
+  authentik-media: {}
+  authentik-templates: {}
+  authentik-certs: {}
+  romm-database: {}
+  romm-resources: {}
+  romm-cache: {}
+  romm-assets: {}
+  prometheus-data: {}
+  grafana-data: {}
+
+secrets:
+  tls_cert:
+    file: ${TLS_CERT_FILE:?set in .env.production}
+  tls_key:
+    file: ${TLS_KEY_FILE:?set in .env.production}

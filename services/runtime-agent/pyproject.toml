@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "retro-runtime-agent"
+version = "0.1.0"
+description = "Narrow privileged runtime lifecycle service"
+requires-python = ">=3.14,<3.15"
+license = "Apache-2.0"
+dependencies = [
+  "pydantic==2.13.5",
+  "PyYAML==6.0.3",
+]
+
+[project.scripts]
+retro-runtime-agent = "retro_runtime.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/retro_runtime"]

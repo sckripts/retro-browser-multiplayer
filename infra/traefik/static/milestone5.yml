@@ -1,0 +1,19 @@
+entryPoints:
+  web:
+    address: ":8080"
+
+providers:
+  file:
+    filename: /etc/traefik/dynamic/milestone5.yml
+    watch: true
+
+api:
+  dashboard: false
+
+ping:
+  entryPoint: web
+
+log:
+  level: INFO
+
+# Access logging is absent because bootstrap URLs contain controller tokens.

@@ -1,0 +1,4 @@
+#!/bin/sh
+# A participant session ends when RetroArch exits or fails. Do not restart into
+# an unattended emulator loop; ask s6 to terminate the whole container.
+exec s6-svscanctl -t /etc/service

@@ -1,0 +1,133 @@
+tls:
+  options:
+    production:
+      minVersion: VersionTLS12
+      sniStrict: true
+  certificates:
+    - certFile: /run/secrets/tls_cert
+      keyFile: /run/secrets/tls_key
+
+http:
+  routers:
+    production-authentik-static:
+      entryPoints: [web]
+      rule: Host(`__AUTH_HOSTNAME__`) && PathPrefix(`/static/`)
+      priority: 20
+      service: production-authentik
+      middlewares: [production-auth-static-chain]
+
+    production-authentik:
+      entryPoints: [web]
+      rule: Host(`__AUTH_HOSTNAME__`)
+      priority: 1
+      service: production-authentik
+      middlewares: [production-auth-chain]
+
+    production-romm:
+      entryPoints: [web]
+      rule: Host(`__PUBLIC_HOSTNAME__`) && PathPrefix(`/`)
+      priority: 1
+      service: production-romm
+      middlewares: [production-romm-chain]
+
+    production-romm-progress:
+      entryPoints: [web]
+      rule: >-
+        Host(`__PUBLIC_HOSTNAME__`) &&
+        (PathPrefix(`/api/saves`) || PathPrefix(`/api/states`))
+      priority: 20
+      service: production-romm
+      middlewares: [production-romm-progress-chain]
+
+  middlewares:
+    production-auth-static-chain:
+      chain:
+        middlewares: [production-security-headers, production-auth-csp, production-auth-static-limit, production-auth-body]
+    production-auth-chain:
+      chain:
+        middlewares: [production-security-headers, production-auth-csp, production-auth-limit, production-auth-body]
+    production-romm-chain:
+      chain:
+        middlewares: [production-security-headers, production-romm-csp, production-romm-limit, production-romm-body]
+    production-romm-progress-chain:
+      chain:
+        middlewares: [production-security-headers, production-romm-csp, production-progress-limit, production-progress-inflight, production-progress-body]
+    production-security-headers:
+      headers:
+        contentTypeNosniff: true
+        forceSTSHeader: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+        permissionsPolicy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+        customResponseHeaders:
+          Referrer-Policy: no-referrer
+          X-Robots-Tag: noindex, nofollow
+    production-auth-csp:
+      headers:
+        contentSecurityPolicyReportOnly: >-
+          default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self';
+          img-src 'self' data:; media-src 'none'; connect-src 'self';
+          font-src 'self' data:; worker-src 'self';
+          script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'
+    production-romm-csp:
+      headers:
+        contentSecurityPolicyReportOnly: >-
+          default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self';
+          img-src 'self' data: blob: https:; media-src 'self' data: blob:;
+          connect-src 'self' blob: https: wss:; font-src 'self' data:;
+          worker-src 'self' blob:;
+          script-src 'self' blob: 'unsafe-inline' 'unsafe-eval';
+          style-src 'self' 'unsafe-inline'
+    production-auth-limit:
+      rateLimit:
+        average: 5
+        period: 1s
+        burst: 20
+    production-auth-static-limit:
+      rateLimit:
+        average: 50
+        period: 1s
+        burst: 200
+    production-romm-limit:
+      rateLimit:
+        average: 20
+        period: 1s
+        burst: 40
+    production-progress-limit:
+      rateLimit:
+        average: 2
+        period: 1s
+        burst: 4
+    production-progress-inflight:
+      inFlightReq:
+        amount: 4
+    production-auth-body:
+      buffering:
+        maxRequestBodyBytes: 65536
+        memRequestBodyBytes: 65536
+    production-romm-body:
+      buffering:
+        maxRequestBodyBytes: 1048576
+        memRequestBodyBytes: 1048576
+    production-progress-body:
+      buffering:
+        maxRequestBodyBytes: 33554432
+        memRequestBodyBytes: 1048576
+
+  services:
+    production-authentik:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: http://authentik-server:9000
+
+    production-romm:
+      loadBalancer:
+        passHostHeader: true
+        healthCheck:
+          path: /api/heartbeat
+          interval: 10s
+          timeout: 3s
+        servers:
+          - url: http://romm:8080

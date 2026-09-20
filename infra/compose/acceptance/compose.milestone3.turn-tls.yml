@@ -1,0 +1,11 @@
+services:
+  retro-session:
+    environment:
+      SELKIES_TURN_PORT: ${M3_TURN_TLS_PORT:-5349}
+      SELKIES_TURN_PROTOCOL: tcp
+      SELKIES_TURN_TLS: "true"
+  turn-rest:
+    environment:
+      TURN_PORT: "5349"
+      TURN_PROTOCOL: "tcp"
+      TURN_TLS: "true"

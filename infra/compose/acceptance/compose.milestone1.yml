@@ -1,0 +1,88 @@
+name: retro-browser-milestone1
+
+services:
+  edge:
+    image: traefik:v3.7.12@sha256:9c2a54d87f76f5c2f5f2682c68394af92fb12c0a2686798d6462a3f84bd78eaf
+    command:
+      - --configFile=/etc/traefik/traefik.yml
+    ports:
+      - "${M1_BIND_ADDRESS:-127.0.0.1}:${M1_HTTP_PORT:-8088}:8080"
+    volumes:
+      - ../../traefik/static/milestone1.yml:/etc/traefik/traefik.yml:ro
+      - ../../traefik/dynamic/milestone1.yml:/etc/traefik/dynamic/milestone1.yml:ro
+    depends_on:
+      selkies:
+        condition: service_healthy
+    networks:
+      - edge
+      - session
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  selkies:
+    image: ghcr.io/selkies-project/selkies/desktop:main-ubuntu26.04@sha256:2f6ab2c01d312e9b066aa1393f99c87983a6f207147ccb93570569c9a3ee9480
+    shm_size: 2gb
+    environment:
+      SELKIES_MASTER_TOKEN: ${SELKIES_MASTER_TOKEN:?set SELKIES_MASTER_TOKEN in the ignored milestone environment file}
+      SELKIES_SUBFOLDER: /stream/m1
+      SELKIES_ALLOWED_ORIGINS: ${M1_ALLOWED_ORIGINS:-}
+      SELKIES_ENABLE_HTTPS: "false"
+      SELKIES_ENABLE_BASIC_AUTH: "false"
+      SELKIES_MODE: websockets
+      SELKIES_ENABLE_DUAL_MODE: "false"
+      SELKIES_ENCODER: h264enc
+      SELKIES_USE_CPU: "true"
+      SELKIES_AUTO_GPU: "false"
+      SELKIES_FRAMERATE: 60-60
+      SELKIES_MANUAL_RESOLUTION: "true"
+      SELKIES_MANUAL_WIDTH: "1280"
+      SELKIES_MANUAL_HEIGHT: "720"
+      SELKIES_ENABLE_RESIZE: "false"
+      SELKIES_SECOND_SCREEN: "false"
+      SELKIES_AUDIO_ENABLED: "true"
+      SELKIES_MICROPHONE_ENABLED: "false"
+      SELKIES_GAMEPAD_ENABLED: "true"
+      SELKIES_UINPUT_GAMEPAD: "false"
+      SELKIES_WEBCAM_ENABLED: "false"
+      SELKIES_WEBCAM_DEVICE: "false"
+      SELKIES_WEBCAM_PIPEWIRE: "false"
+      SELKIES_ENABLE_CLIPBOARD: "false"
+      SELKIES_ENABLE_BINARY_CLIPBOARD: "false"
+      SELKIES_COMMAND_ENABLED: "false"
+      SELKIES_FILE_TRANSFERS: none
+      SELKIES_ENABLE_SHARING: "false"
+      SELKIES_ENABLE_COLLAB: "false"
+      SELKIES_UI_SIDEBAR_SHOW_CLIPBOARD: "false"
+      SELKIES_UI_SIDEBAR_SHOW_FILES: "false"
+      SELKIES_UI_SIDEBAR_SHOW_SHARING: "false"
+      SELKIES_UI_SIDEBAR_SHOW_WEBCAM: "false"
+      SELKIES_ENABLE_INTERNAL_TURN: "false"
+    expose:
+      - "8080"
+    networks:
+      - session
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/stream/m1/api/health', timeout=2)
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+
+networks:
+  edge: {}
+  session:
+    internal: true

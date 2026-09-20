@@ -1,0 +1,14 @@
+services:
+  retro-host:
+    gpus: all
+    environment:
+      SELKIES_USE_CPU: "false"
+      SELKIES_AUTO_GPU: nvidia
+      NVIDIA_DRIVER_CAPABILITIES: compute,graphics,utility,video
+
+  retro-client:
+    gpus: all
+    environment:
+      SELKIES_USE_CPU: "false"
+      SELKIES_AUTO_GPU: nvidia
+      NVIDIA_DRIVER_CAPABILITIES: compute,graphics,utility,video

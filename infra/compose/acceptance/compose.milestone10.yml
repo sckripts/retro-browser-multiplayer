@@ -1,0 +1,168 @@
+name: retro-browser-milestone10
+
+services:
+  runtime-agent:
+    build:
+      context: ../../..
+      dockerfile: services/runtime-agent/Dockerfile
+    image: retrobrowser/runtime-agent:milestone10
+    depends_on:
+      network-anchor:
+        condition: service_completed_successfully
+    environment:
+      RUNTIME_AGENT_APPROVED_IMAGE: ${M10_RUNTIME_IMAGE:?set M10_RUNTIME_IMAGE}
+      RUNTIME_AGENT_APPROVED_NETWORKS: retrobrowser-m10-stream,retrobrowser-m10-retro-net
+      RUNTIME_AGENT_ROM_ROOT: /srv/retrobrowser/roms
+      RUNTIME_AGENT_USER_DATA_ROOT: /srv/retrobrowser/userdata
+      RUNTIME_AGENT_DOCKER_ROM_ROOT: ${M10_DOCKER_ROM_ROOT:?set M10_DOCKER_ROM_ROOT}
+      RUNTIME_AGENT_DOCKER_USER_DATA_ROOT: ${M10_DOCKER_USER_DATA_ROOT:?set M10_DOCKER_USER_DATA_ROOT}
+      RUNTIME_AGENT_MANAGE_USER_DATA_PERMISSIONS: "false"
+      RUNTIME_AGENT_ROUTE_ROOT: /srv/retrobrowser/routes
+      RUNTIME_AGENT_ALLOWED_ORIGINS: http://127.0.0.1:8094
+      RUNTIME_AGENT_GPU_PROFILES: cpu
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - type: bind
+        source: ${M10_DOCKER_ROM_ROOT:?set M10_DOCKER_ROM_ROOT}
+        target: /srv/retrobrowser/roms
+        read_only: true
+      - type: bind
+        source: ${M10_DOCKER_USER_DATA_ROOT:?set M10_DOCKER_USER_DATA_ROOT}
+        target: /srv/retrobrowser/userdata
+      - type: bind
+        source: ${M10_DOCKER_ROUTE_ROOT:?set M10_DOCKER_ROUTE_ROOT}
+        target: /srv/retrobrowser/routes
+      - runtime-agent-control:/run/retrobrowser
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-m", "retro_runtime.client", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  session-manager:
+    build:
+      context: ../../..
+      dockerfile: services/session-manager/Dockerfile
+    image: retrobrowser/session-manager:milestone10
+    depends_on:
+      runtime-agent:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    environment:
+      SESSION_MANAGER_SERVICE_TOKEN: ${M10_SERVICE_TOKEN:?set M10_SERVICE_TOKEN}
+      SESSION_MANAGER_ORCHESTRATION_SECRET: ${M10_ORCHESTRATION_SECRET:?set M10_ORCHESTRATION_SECRET}
+      SESSION_MANAGER_RUNTIME_IMAGE: ${M10_RUNTIME_IMAGE:?set M10_RUNTIME_IMAGE}
+      SESSION_MANAGER_STREAM_NETWORK: retrobrowser-m10-stream
+      SESSION_MANAGER_NETPLAY_NETWORK: retrobrowser-m10-retro-net
+      SESSION_MANAGER_ROM_ROOT: /srv/retrobrowser/roms
+      SESSION_MANAGER_ROM_PATH: /srv/retrobrowser/roms/${M10_ROM_FILENAME:?set M10_ROM_FILENAME}
+      SESSION_MANAGER_ROM_SHA256: ${M10_ROM_SHA256:?set M10_ROM_SHA256}
+      SESSION_MANAGER_ROMM_ROM_ID: "1"
+      SESSION_MANAGER_MAX_SESSION_SECONDS: "300"
+      SESSION_MANAGER_LOBBY_LEASE_SECONDS: "60"
+      SESSION_MANAGER_IDLE_TIMEOUT_SECONDS: "30"
+      SESSION_MANAGER_CLEANUP_INTERVAL_SECONDS: "5"
+      VALKEY_URL: redis://valkey:6379/0
+    volumes:
+      - runtime-agent-control:/run/retrobrowser
+      - type: bind
+        source: ${M10_DOCKER_ROM_ROOT:?set M10_DOCKER_ROM_ROOT}
+        target: /srv/retrobrowser/roms
+        read_only: true
+    networks:
+      - control
+      - stream
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz', timeout=2)
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  valkey:
+    image: valkey/valkey:9.1.2-alpine@sha256:a174b894902bd3367e330d47cc2054367dc4917701776aaf336f41d83b65ec7a
+    command: ["valkey-server", "--save", "", "--appendonly", "no"]
+    user: "999:1000"
+    networks:
+      - control
+    read_only: true
+    tmpfs:
+      - /data
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  edge:
+    image: traefik:v3.7.12@sha256:9c2a54d87f76f5c2f5f2682c68394af92fb12c0a2686798d6462a3f84bd78eaf
+    command: ["--configFile=/etc/traefik/traefik.yml"]
+    ports:
+      - "127.0.0.1:8094:8080"
+    volumes:
+      - ../../traefik/static/milestone10.yml:/etc/traefik/traefik.yml:ro
+      - type: bind
+        source: ${M10_DOCKER_ROUTE_ROOT:?set M10_DOCKER_ROUTE_ROOT}
+        target: /etc/traefik/dynamic
+        read_only: true
+    networks:
+      - ingress
+      - stream
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  network-anchor:
+    image: retrobrowser/runtime-agent:milestone10
+    entrypoint: ["python", "-c", "pass"]
+    networks:
+      - stream
+      - retro-net
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  ingress: {}
+  control:
+    internal: true
+  stream:
+    name: retrobrowser-m10-stream
+    internal: true
+  retro-net:
+    name: retrobrowser-m10-retro-net
+    internal: true
+
+volumes:
+  runtime-agent-control: {}

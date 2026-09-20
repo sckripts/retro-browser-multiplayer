@@ -1,0 +1,90 @@
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "23 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  repository:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+      - name: Verify publishable repository content
+        shell: pwsh
+        run: ./tools/repository-audit/verify-public.ps1 -IncludeHistory
+      - name: Scan Git history for secrets
+        run: >-
+          docker run --rm
+          --volume "$GITHUB_WORKSPACE:/repo:ro"
+          ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+          git /repo --redact --no-banner
+      - name: Generate repository SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          path: .
+          format: cyclonedx-json
+          artifact-name: retrobrowser-source-sbom.cdx.json
+          output-file: retrobrowser-source-sbom.cdx.json
+          upload-artifact-retention: 30
+      - name: Scan source and locked dependencies
+        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7
+        with:
+          path: .
+          fail-build: true
+          severity-cutoff: high
+          only-fixed: true
+          output-format: table
+
+  custom-images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: session-manager
+            dockerfile: services/session-manager/Dockerfile
+          - name: runtime-agent
+            dockerfile: services/runtime-agent/Dockerfile
+          - name: retro-session
+            dockerfile: images/retro-session/Dockerfile
+    steps:
+      - name: Reclaim runner disk for the large retro-session image
+        if: matrix.name == 'retro-session'
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+        with:
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          tool-cache: false
+          swap-storage: false
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Build ${{ matrix.name }}
+        run: docker build --file "${{ matrix.dockerfile }}" --tag "retrobrowser/${{ matrix.name }}:security-scan" .
+      - name: Generate image SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          image: retrobrowser/${{ matrix.name }}:security-scan
+          format: cyclonedx-json
+          artifact-name: retrobrowser-${{ matrix.name }}-sbom.cdx.json
+          output-file: retrobrowser-${{ matrix.name }}-sbom.cdx.json
+          upload-artifact-retention: 30
+      - name: Scan image
+        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7
+        with:
+          image: retrobrowser/${{ matrix.name }}:security-scan
+          fail-build: true
+          severity-cutoff: high
+          only-fixed: true
+          output-format: table

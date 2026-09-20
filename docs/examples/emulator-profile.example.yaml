@@ -1,0 +1,43 @@
+# Planning template only. This file is not read by the runtime.
+profile_id: example-system-core
+romm:
+  platform_slug: example-system
+  aliases: []
+runtime:
+  platform: linux-amd64
+  max_players: 2
+  controller_topology: standard-retropad
+  controller_port_devices: {}
+frontend:
+  name: RetroArch
+  version: replace-with-pinned-version
+  source_commit: replace-with-full-commit
+  source_archive_sha256: replace-with-sha256
+  artifact_sha256: replace-with-sha256
+  license: replace-after-review
+core:
+  name: replace-with-core-name
+  version: replace-with-pinned-version
+  repository: https://example.invalid/core
+  source_commit: replace-with-full-commit
+  source_archive_sha256: replace-with-sha256
+  artifact_path: /opt/libretro/example_libretro.so
+  artifact_sha256: replace-with-sha256
+  license: replace-after-review
+  redistribution: replace-after-license-review
+  netplay_status: planned
+bios:
+  required: false
+  # BIOS-dependent profiles require a future trusted server-side BIOS mount design.
+content:
+  layout: single-file
+  # Disc sets and playlists require a future trusted content-set resolver.
+acceptance:
+  required_clients: 2
+  scenarios:
+    - deterministic-two-client-play
+    - reconnect
+    - participant-join-and-leave
+    - turn-relay
+    - cleanup
+    - save-persistence

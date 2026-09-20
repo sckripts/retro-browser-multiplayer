@@ -1,0 +1,13 @@
+name: retro-browser-milestone14
+
+# In-place extension of the accepted public stack. Keeping the Compose project
+# preserves Milestone 14's identity/database volumes and public endpoint.
+services:
+  runtime-agent:
+    image: retrobrowser/runtime-agent:milestone15
+
+  session-manager:
+    image: retrobrowser/session-manager:milestone15
+
+  network-anchor:
+    image: retrobrowser/runtime-agent:milestone15

@@ -1,0 +1,92 @@
+name: retro-browser-milestone6
+
+services:
+  runtime-agent:
+    build:
+      context: ../../..
+      dockerfile: services/runtime-agent/Dockerfile
+    image: retrobrowser/runtime-agent:milestone6
+    depends_on:
+      network-anchor:
+        condition: service_completed_successfully
+    environment:
+      RUNTIME_AGENT_APPROVED_IMAGE: ${M6_RUNTIME_IMAGE:?set M6_RUNTIME_IMAGE}
+      RUNTIME_AGENT_APPROVED_NETWORKS: retrobrowser-m6-stream,retrobrowser-m6-retro-net
+      RUNTIME_AGENT_ROM_ROOT: /srv/retrobrowser/roms
+      RUNTIME_AGENT_USER_DATA_ROOT: /srv/retrobrowser/userdata
+      RUNTIME_AGENT_DOCKER_ROM_ROOT: ${M6_DOCKER_ROM_ROOT:?set M6_DOCKER_ROM_ROOT}
+      RUNTIME_AGENT_DOCKER_USER_DATA_ROOT: ${M6_DOCKER_USER_DATA_ROOT:?set M6_DOCKER_USER_DATA_ROOT}
+      RUNTIME_AGENT_PREPROVISIONED_USER_DATA: "true"
+      RUNTIME_AGENT_ROUTE_ROOT: /srv/retrobrowser/routes
+      RUNTIME_AGENT_ALLOWED_ORIGINS: http://127.0.0.1:8091
+      RUNTIME_AGENT_GPU_PROFILES: cpu
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - type: bind
+        source: ${M6_DOCKER_ROM_ROOT:?set M6_DOCKER_ROM_ROOT}
+        target: /srv/retrobrowser/roms
+        read_only: true
+      - type: bind
+        source: ${M6_DOCKER_USER_DATA_ROOT:?set M6_DOCKER_USER_DATA_ROOT}
+        target: /srv/retrobrowser/userdata
+      - type: bind
+        source: ${M6_DOCKER_ROUTE_ROOT:?set M6_DOCKER_ROUTE_ROOT}
+        target: /srv/retrobrowser/routes
+      - runtime-agent-control:/run/retrobrowser
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -m
+        - retro_runtime.client
+        - health
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  network-anchor:
+    image: retrobrowser/runtime-agent:milestone6
+    entrypoint: ["python", "-c", "pass"]
+    networks:
+      - runtime-stream
+      - retro-net
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  runtime-agent-client:
+    image: retrobrowser/runtime-agent:milestone6
+    entrypoint: ["python", "-m", "retro_runtime.client"]
+    volumes:
+      - runtime-agent-control:/run/retrobrowser
+      - type: bind
+        source: ${M6_DOCKER_REQUEST_ROOT:?set M6_DOCKER_REQUEST_ROOT}
+        target: /requests
+        read_only: true
+    network_mode: none
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  runtime-stream:
+    name: retrobrowser-m6-stream
+    internal: true
+  retro-net:
+    name: retrobrowser-m6-retro-net
+    internal: true
+
+volumes:
+  runtime-agent-control: {}

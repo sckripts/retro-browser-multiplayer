@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+
+if [ -z "${RETROBROWSER_METRICS_TOKEN:-}" ]; then
+  exec sleep infinity
+fi
+
+exec python3 -m session_entrypoint.metrics_proxy

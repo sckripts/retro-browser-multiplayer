@@ -1,0 +1,20 @@
+name: retro-browser-milestone14
+
+# In-place persistence extension of the accepted public stack. Runtime Agent
+# remains the only component that can select or mount the durable save root.
+services:
+  runtime-agent:
+    image: retrobrowser/runtime-agent:milestone17
+    environment:
+      RUNTIME_AGENT_SAVE_DATA_ROOT: /srv/retrobrowser/saves
+      RUNTIME_AGENT_DOCKER_SAVE_DATA_ROOT: ${M17_DOCKER_SAVE_ROOT:?set in .env.milestone14}
+    volumes:
+      - type: bind
+        source: ${M17_DOCKER_SAVE_ROOT:?set in .env.milestone14}
+        target: /srv/retrobrowser/saves
+
+  session-manager:
+    image: retrobrowser/session-manager:milestone17
+
+  network-anchor:
+    image: retrobrowser/runtime-agent:milestone17

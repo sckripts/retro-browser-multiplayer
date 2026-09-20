@@ -1,0 +1,165 @@
+name: retro-browser-milestone11
+
+volumes:
+  authentik-postgres:
+  authentik-media:
+  authentik-templates:
+  authentik-certs:
+  romm-database:
+  romm-resources:
+  romm-cache:
+  romm-library:
+  romm-assets:
+
+networks:
+  identity:
+  romm-data:
+    internal: true
+
+x-authentik-environment: &authentik-environment
+  AUTHENTIK_SECRET_KEY: ${M11_AUTHENTIK_SECRET_KEY:?set in .env.milestone11}
+  AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
+  AUTHENTIK_POSTGRESQL__NAME: authentik
+  AUTHENTIK_POSTGRESQL__USER: authentik
+  AUTHENTIK_POSTGRESQL__PASSWORD: ${M11_AUTHENTIK_POSTGRES_PASSWORD:?set in .env.milestone11}
+  AUTHENTIK_EMAIL__HOST: mailpit
+  AUTHENTIK_EMAIL__PORT: "1025"
+  AUTHENTIK_EMAIL__USE_TLS: "false"
+  AUTHENTIK_EMAIL__USE_SSL: "false"
+  AUTHENTIK_EMAIL__FROM: ${M11_SMTP_FROM:?set in .env.milestone11}
+  AUTHENTIK_BOOTSTRAP_EMAIL: ${M11_ADMIN_EMAIL:?set in .env.milestone11}
+  AUTHENTIK_BOOTSTRAP_PASSWORD: ${M11_ADMIN_PASSWORD:?set in .env.milestone11}
+  AUTHENTIK_BOOTSTRAP_TOKEN: ${M11_BOOTSTRAP_TOKEN:?set in .env.milestone11}
+  M11_OIDC_CLIENT_ID: ${M11_OIDC_CLIENT_ID:?set in .env.milestone11}
+  M11_OIDC_CLIENT_SECRET: ${M11_OIDC_CLIENT_SECRET:?set in .env.milestone11}
+  M11_ROMM_URL: ${M11_ROMM_URL:?set in .env.milestone11}
+  M11_ROMM_CALLBACK_URL: ${M11_ROMM_URL:?set in .env.milestone11}/api/oauth/openid
+  M11_ROMM_LOGIN_URL: ${M11_ROMM_URL:?set in .env.milestone11}/api/login/openid
+
+x-authentik-volumes: &authentik-volumes
+  - authentik-media:/media
+  - authentik-templates:/templates
+  - authentik-certs:/certs
+  - ../../authentik/blueprints:/blueprints/custom:ro
+
+services:
+  authentik-postgres:
+    image: postgres:16.10-alpine@sha256:029660641a0cfc575b14f336ba448fb8a75fd595d42e1fa316b9fb4378742297
+    environment:
+      POSTGRES_DB: authentik
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: ${M11_AUTHENTIK_POSTGRES_PASSWORD:?set in .env.milestone11}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d authentik -U authentik"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [identity]
+    volumes:
+      - authentik-postgres:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2026.8.1@sha256:9d605ed569ff9f39146be39da93714b2acf19072acc4ab0f0e2f2d81be88cdce
+    command: server
+    environment: *authentik-environment
+    volumes: *authentik-volumes
+    depends_on:
+      authentik-postgres:
+        condition: service_healthy
+    networks: [identity]
+    ports:
+      - "127.0.0.1:9000:9000"
+    healthcheck:
+      test: ["CMD", "ak", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2026.8.1@sha256:9d605ed569ff9f39146be39da93714b2acf19072acc4ab0f0e2f2d81be88cdce
+    command: worker
+    environment: *authentik-environment
+    volumes: *authentik-volumes
+    depends_on:
+      authentik-postgres:
+        condition: service_healthy
+    networks: [identity]
+    healthcheck:
+      test: ["CMD", "ak", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.27.8@sha256:6abc8e633df15eaf785cfcf38bae48e66f64beecdc03121e249d0f9ec15f0707
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+    networks: [identity]
+    ports:
+      - "127.0.0.1:8025:8025"
+    restart: unless-stopped
+
+  romm-database:
+    image: mariadb:11.8.3@sha256:ae6119716edac6998ae85508431b3d2e666530ddf4e94c61a10710caec9b0f71
+    environment:
+      MARIADB_DATABASE: romm
+      MARIADB_USER: romm
+      MARIADB_PASSWORD: ${M11_ROMM_DB_PASSWORD:?set in .env.milestone11}
+      MARIADB_ROOT_PASSWORD: ${M11_ROMM_DB_ROOT_PASSWORD:?set in .env.milestone11}
+    volumes:
+      - romm-database:/var/lib/mysql
+    networks: [romm-data]
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+  romm:
+    image: rommapp/romm:5.2.0@sha256:3512f2ca455782f90247271bed23116e6bc675bc74e379be2c41696e607ab11e
+    environment:
+      DB_HOST: romm-database
+      DB_NAME: romm
+      DB_USER: romm
+      DB_PASSWD: ${M11_ROMM_DB_PASSWORD:?set in .env.milestone11}
+      ROMM_AUTH_SECRET_KEY: ${M11_ROMM_AUTH_SECRET_KEY:?set in .env.milestone11}
+      ROMM_BASE_URL: ${M11_ROMM_URL:?set in .env.milestone11}
+      OIDC_ENABLED: "true"
+      OIDC_AUTOLOGIN: "false"
+      OIDC_ALLOW_REGISTRATION: "true"
+      OIDC_PROVIDER: authentik
+      OIDC_CLIENT_ID: ${M11_OIDC_CLIENT_ID:?set in .env.milestone11}
+      OIDC_CLIENT_SECRET: ${M11_OIDC_CLIENT_SECRET:?set in .env.milestone11}
+      OIDC_REDIRECT_URI: ${M11_ROMM_URL:?set in .env.milestone11}/api/oauth/openid
+      OIDC_SERVER_APPLICATION_URL: ${M11_AUTHENTIK_URL:?set in .env.milestone11}/application/o/romm
+      OIDC_USERNAME_ATTRIBUTE: sub
+    extra_hosts:
+      - "auth.127.0.0.1.nip.io:host-gateway"
+    depends_on:
+      romm-database:
+        condition: service_healthy
+      authentik-server:
+        condition: service_healthy
+    networks: [identity, romm-data]
+    ports:
+      - "127.0.0.1:8095:8080"
+    volumes:
+      - romm-resources:/romm/resources
+      - romm-cache:/redis-data
+      - romm-library:/romm/library
+      - romm-assets:/romm/assets
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/api/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 45s
+    restart: unless-stopped

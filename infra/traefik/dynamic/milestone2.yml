@@ -1,0 +1,28 @@
+http:
+  routers:
+    milestone2-selkies:
+      entryPoints:
+        - web
+      rule: PathPrefix(`/stream/m2`)
+      service: milestone2-selkies
+      middlewares:
+        - milestone2-response-headers
+
+  middlewares:
+    milestone2-response-headers:
+      headers:
+        contentTypeNosniff: true
+        customResponseHeaders:
+          Referrer-Policy: no-referrer
+          X-Robots-Tag: noindex, nofollow
+
+  services:
+    milestone2-selkies:
+      loadBalancer:
+        passHostHeader: true
+        healthCheck:
+          path: /stream/m2/api/health
+          interval: 5s
+          timeout: 2s
+        servers:
+          - url: http://retro-session:8080
