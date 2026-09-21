@@ -1,4 +1,4 @@
-FROM ghcr.io/selkies-project/selkies/desktop:main-ubuntu26.04@sha256:2f6ab2c01d312e9b066aa1393f99c87983a6f207147ccb93570569c9a3ee9480 AS builder
+FROM ghcr.io/selkies-project/selkies/desktop:2.0.0rc1-ubuntu26.04@sha256:07ba642f431915158a7f4cec69d46303704816dced17d4ee95bd34b2a1ef23eb AS builder
 
 USER root
 
@@ -118,7 +118,7 @@ RUN curl --fail --location --silent --show-error \
     && sha256sum /opt/retro-session/opt/libretro/blastem_libretro.so \
         > /opt/retro-session/blastem_libretro.sha256
 
-FROM ghcr.io/selkies-project/selkies/desktop:main-ubuntu26.04@sha256:2f6ab2c01d312e9b066aa1393f99c87983a6f207147ccb93570569c9a3ee9480
+FROM ghcr.io/selkies-project/selkies/desktop:2.0.0rc1-ubuntu26.04@sha256:07ba642f431915158a7f4cec69d46303704816dced17d4ee95bd34b2a1ef23eb
 
 USER root
 

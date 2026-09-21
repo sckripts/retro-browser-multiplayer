@@ -64,12 +64,12 @@ The verifier keeps launch JSON in memory, never prints the token, expects `401` 
 the tokenless gameplay WebSocket, expects `101` with the scoped token, rejects a launch
 attempt by a non-participant, and retires the runtime through the leave API.
 
-The implementation was checked against the official Selkies repository. The pinned
-runtime commit remains `3f87241fcd6abc44e205b22f6596e78ef4946670`; current upstream
-`main` was `f95210a33041b2311a9e912f54f9b75203fefcdb` on 2026-09-02. The documented
-`POST /api/tokens` replacement contract and controller `slot` semantics are unchanged
-between those revisions. The latest formal release remains v1.6.2, which predates the
-secure-mode runtime pin.
+The implementation was checked against the official Selkies repository. At Milestone 9
+acceptance, the pinned runtime commit was `3f87241fcd6abc44e205b22f6596e78ef4946670`
+and upstream `main` was `f95210a33041b2311a9e912f54f9b75203fefcdb`. The runtime pin was
+subsequently refreshed to the versioned `2.0.0rc1` release at
+`e6d04050955523a4e026e4dceef7c35096150fa1`; the documented `POST /api/tokens`
+replacement contract and controller `slot` semantics remain required by this project.
 
 ## Acceptance evidence
 

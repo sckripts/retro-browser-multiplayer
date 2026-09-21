@@ -15,7 +15,7 @@ No browser value can select a ROM path.
 
 ## Pinned runtime
 
-- Selkies image index: `sha256:2f6ab2c01d312e9b066aa1393f99c87983a6f207147ccb93570569c9a3ee9480`
+- Selkies image index: `sha256:07ba642f431915158a7f4cec69d46303704816dced17d4ee95bd34b2a1ef23eb`
 - RetroArch: `1.22.2`, commit `69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576`
 - RetroArch binary SHA-256: `e7b3a9611e0d7bc429aac2cf92cafb7eeea3f730afaa7b0534805a01512ab73c`
 - Mesen: `0.9.9`, commit `f3a18bed018fa853627e0e15d02a3f2ba4960222`

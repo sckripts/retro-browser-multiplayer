@@ -11,7 +11,7 @@ TRAEFIK_DYNAMIC = (ROOT / "infra/traefik/dynamic/milestone1.yml").read_text(enco
 
 def test_images_are_immutable_digest_pins() -> None:
     assert "traefik:v3.7.12@sha256:" in COMPOSE
-    assert "desktop:main-ubuntu26.04@sha256:" in COMPOSE
+    assert "desktop:2.0.0rc1-ubuntu26.04@sha256:" in COMPOSE
     assert ":latest" not in COMPOSE
 
 

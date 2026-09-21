@@ -163,16 +163,16 @@ Important files:
 
 Pinned runtime artifacts:
 
-- Selkies source commit: `3f87241fcd6abc44e205b22f6596e78ef4946670`
-- Selkies image index: `sha256:2f6ab2c01d312e9b066aa1393f99c87983a6f207147ccb93570569c9a3ee9480`
-- Selkies amd64 manifest: `sha256:0cfad57d761da912b279dc226850ffe77aae3a6d4379bca4844d87b111982e0d`
+- Selkies source commit: `e6d04050955523a4e026e4dceef7c35096150fa1`
+- Selkies image index: `sha256:07ba642f431915158a7f4cec69d46303704816dced17d4ee95bd34b2a1ef23eb`
+- Selkies amd64 manifest: `sha256:0bfcce1fa30024a8eb34e2504a74e1fb18f4c1424d92c1b6ad6282fb3b1ae87b`
 - Traefik: `v3.7.12`
 - Traefik image index: `sha256:9c2a54d87f76f5c2f5f2682c68394af92fb12c0a2686798d6462a3f84bd78eaf`
 
-Selkies `v1.6.2` is still the latest formal release that was found during Milestone 1,
-but its tagged source lacks secure mode and native subfolder routing. The proof therefore
-uses the exact unreleased upstream commit/image above. Re-check current official upstream
-state before changing the pin.
+Milestone 1 originally required an unreleased snapshot because Selkies `v1.6.2` lacked
+secure mode and native subfolder routing. The pin was refreshed on 2026-09-21 to the
+versioned `2.0.0rc1` release above after the old rolling-tag digest was removed upstream.
+Re-check the official release and runtime contract before changing this pin.
 
 The stack uses Selkies secure mode, native `/stream/m1` subfolder routing, same-origin
 WebSockets, fixed 1280x720 at 60 fps, stereo Opus audio, keyboard/mouse/gamepad input,

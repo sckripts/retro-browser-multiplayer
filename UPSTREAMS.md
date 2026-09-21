@@ -35,17 +35,17 @@ selected for the implemented browser/runtime proofs.
 - Purpose: HTML5 video/audio/input streaming
 - Canonical repository: https://github.com/selkies-project/selkies
 - License: MPL-2.0 for project files; bundled wheels/images include separately licensed components
-- Latest formal release: v1.6.2, commit `7a80d7eea94f7ff5e754407a18364f4008d8b0fd`
-- Selected artifact status: unreleased upstream `main` snapshot; v1.6.2 lacks required secure mode and subfolder routing
-- Selected commit: `3f87241fcd6abc44e205b22f6596e78ef4946670`
+- Latest formal release: 2.0.0rc1, commit `e6d04050955523a4e026e4dceef7c35096150fa1`
+- Selected artifact status: versioned 2.0.0rc1 release with required secure mode and subfolder routing
+- Selected commit: `e6d04050955523a4e026e4dceef7c35096150fa1`
 - Current upstream `main` observed for Milestone 9:
   `f95210a33041b2311a9e912f54f9b75203fefcdb`; the token replacement and slot
   contract used by the selected commit remains current
 - Successful upstream CI run: https://github.com/selkies-project/selkies/actions/runs/33318518640
-- Container/package: `ghcr.io/selkies-project/selkies/desktop:main-ubuntu26.04`
-- Multi-platform image digest: `sha256:2f6ab2c01d312e9b066aa1393f99c87983a6f207147ccb93570569c9a3ee9480`
-- amd64 manifest digest: `sha256:0cfad57d761da912b279dc226850ffe77aae3a6d4379bca4844d87b111982e0d`
-- Date verified: 2026-09-02
+- Container/package: `ghcr.io/selkies-project/selkies/desktop:2.0.0rc1-ubuntu26.04`
+- Multi-platform image digest: `sha256:07ba642f431915158a7f4cec69d46303704816dced17d4ee95bd34b2a1ef23eb`
+- amd64 manifest digest: `sha256:0bfcce1fa30024a8eb34e2504a74e1fb18f4c1424d92c1b6ad6282fb3b1ae87b`
+- Date verified: 2026-09-21
 - Modification status: unmodified upstream image, configured externally
 - Security notes: secure mode keeps the master token server-side and provisions scoped client tokens; bootstrap URLs contain client tokens, so proxy access logging is disabled
 - Network notes: Milestone 1 uses same-origin WebSockets behind `/stream/m1`;

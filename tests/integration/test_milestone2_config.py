@@ -20,7 +20,7 @@ ROM_SHA256 = "847155bb712e474f71554174c9d9ed402bf651b13ff1e4afc9a42ec69cd03d8d"
 
 
 def test_runtime_is_derived_from_the_immutable_selkies_image() -> None:
-    assert "desktop:main-ubuntu26.04@sha256:" in DOCKERFILE
+    assert "desktop:2.0.0rc1-ubuntu26.04@sha256:" in DOCKERFILE
     assert "ARG RETROARCH_COMMIT=69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576" in DOCKERFILE
     assert "ARG MESEN_COMMIT=f3a18bed018fa853627e0e15d02a3f2ba4960222" in DOCKERFILE
     assert "sha256sum --check" in DOCKERFILE

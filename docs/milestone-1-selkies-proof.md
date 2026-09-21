@@ -14,22 +14,20 @@ work assigned to Milestone 3.
 
 ## Upstream selection
 
-The latest formal Selkies release is `v1.6.2`, but that tag does not contain the
-required secure-mode master/session token API or native subfolder routing. Those
-features exist on upstream `main`. For that reason this proof pins the immutable image
-published by the successful CI run for commit
-`3f87241fcd6abc44e205b22f6596e78ef4946670`:
+Milestone 1 originally used an unreleased upstream snapshot because Selkies `v1.6.2`
+did not contain the required secure-mode token API or native subfolder routing. The
+runtime pin was refreshed on 2026-09-21 to the versioned `2.0.0rc1` release at commit
+`e6d04050955523a4e026e4dceef7c35096150fa1`:
 
 ```text
-ghcr.io/selkies-project/selkies/desktop:main-ubuntu26.04
-@sha256:2f6ab2c01d312e9b066aa1393f99c87983a6f207147ccb93570569c9a3ee9480
+ghcr.io/selkies-project/selkies/desktop:2.0.0rc1-ubuntu26.04
+@sha256:07ba642f431915158a7f4cec69d46303704816dced17d4ee95bd34b2a1ef23eb
 ```
 
 The selected multi-platform index resolves to amd64 manifest
-`sha256:0cfad57d761da912b279dc226850ffe77aae3a6d4379bca4844d87b111982e0d`
-on this development host. It is an unreleased upstream snapshot, not a Selkies stable
-release. Re-evaluate and prefer a formal release once one contains both required
-features.
+`sha256:0bfcce1fa30024a8eb34e2504a74e1fb18f4c1424d92c1b6ad6282fb3b1ae87b`.
+Both the version tag and digest are pinned so a moving development tag cannot silently
+replace or remove the build input.
 
 Traefik is pinned to `v3.7.12` and image index
 `sha256:9c2a54d87f76f5c2f5f2682c68394af92fb12c0a2686798d6462a3f84bd78eaf`.
