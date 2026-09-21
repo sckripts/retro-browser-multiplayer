@@ -8,6 +8,9 @@ production deployment method.
 The deployment target is a native Linux Docker host. PowerShell 7 is required for the
 operator scripts. Docker Desktop remains suitable for development, not a public host.
 
+For a clean Ubuntu Server 24.04 LTS installation hosted by Hyper-V, follow the
+[Hyper-V installation runbook](runbooks/hyper-v-ubuntu-24.04-install.md).
+
 ## Ten-step procedure
 
 1. **Prepare the host.** Install current Docker Engine with Compose v2 and PowerShell

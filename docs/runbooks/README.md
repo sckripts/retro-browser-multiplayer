@@ -1,5 +1,9 @@
 # Runbooks
 
+Deployment:
+
+- [Hyper-V Ubuntu 24.04 installation](hyper-v-ubuntu-24.04-install.md)
+
 Milestone 18 operational runbooks:
 
 - [Stream will not connect](stream-will-not-connect.md)

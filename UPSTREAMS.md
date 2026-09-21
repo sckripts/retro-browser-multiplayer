@@ -23,8 +23,9 @@ selected for the implemented browser/runtime proofs.
 - Local fork: `<separate-romm-worktree>`; `origin` is `https://github.com/YOUR_GITHUB_OWNER/romm.git` and
   `upstream` is `https://github.com/rommapp/romm.git`
 - Milestone 12 fork base: upstream `master` commit
-  `2d089fe91442c49a9746ec10ec7a2c6441500b7f`, verified 2026-09-06; accepted fork
-  commit `50d1e6c94` is on `feat/external-multiplayer-provider`
+  `2d089fe91442c49a9746ec10ec7a2c6441500b7f`, verified 2026-09-06
+- Accepted fork release: `retrobrowser-v0.1.0` at commit
+  `4bb2e5205b1aacc147cb1091403c9c0783234f28`, verified 2026-09-21
 - Security notes: modified network-facing versions must provide corresponding source
 - Update notes: the current official environment template exposes native OIDC settings
 
